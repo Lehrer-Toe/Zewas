@@ -485,15 +485,41 @@ body {
     box-shadow: 0 0 10px rgba(255,255,255,0.5);
 }
 
-/* Verbesserte Notenfarben - IMMER mit Farbe */
-.note-1-0, .note-1-5 { background: #27ae60; color: white; } /* Dunkelgrün */
-.note-2-0 { background: #2ecc71; color: white; } /* Grün */
-.note-2-5 { background: #f39c12; color: white; } /* Orange */
-.note-3-0 { background: #f1c40f; color: #333; } /* Gelb */
-.note-3-5 { background: #e67e22; color: white; } /* Orange */
-.note-4-0, .note-4-5 { background: #e74c3c; color: white; } /* Rot */
-.note-5-0, .note-5-5 { background: #c0392b; color: white; } /* Dunkelrot */
-.note-6-0 { background: #8b0000; color: white; } /* Sehr dunkelrot */
+/* Verbesserte Notenfarben - OHNE weißen Hintergrund */
+.note-1-0 { background: #27ae60; color: white; } /* Sehr gut - Dunkelgrün */
+.note-1-5 { background: #2ecc71; color: white; } /* Sehr gut - Grün */
+.note-2-0 { background: #58d68d; color: white; } /* Gut - Hellgrün */
+.note-2-5 { background: #85c1e9; color: white; } /* Gut - Hellblau */
+.note-3-0 { background: #5dade2; color: white; } /* Befriedigend - Blau */
+.note-3-5 { background: #f39c12; color: white; } /* Befriedigend - Orange */
+.note-4-0 { background: #e67e22; color: white; } /* Ausreichend - Dunkelorange */
+.note-4-5 { background: #e74c3c; color: white; } /* Ausreichend - Rot */
+.note-5-0 { background: #c0392b; color: white; } /* Mangelhaft - Dunkelrot */
+.note-5-5 { background: #922b21; color: white; } /* Mangelhaft - Sehr dunkelrot */
+.note-6-0 { background: #641e16; color: white; } /* Ungenügend - Sehr dunkelrot */
+
+.note-btn {
+    width: 50px;
+    height: 50px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+    /* Entfernt jeglichen weißen Hintergrund */
+.note-btn:hover {
+    transform: scale(1.1);
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+.note-btn.selected {
+    border-color: #fff;
+    transform: scale(1.15);
+    box-shadow: 0 0 15px rgba(255,255,255,0.8);
+}
 
 .nicht-bewertet-btn {
     background: #95a5a6;
@@ -505,6 +531,12 @@ body {
     font-size: 1.5rem;
     cursor: pointer;
     margin-left: 10px;
+    transition: all 0.2s;
+}
+
+.nicht-bewertet-btn:hover {
+    background: #7f8c8d;
+    transform: scale(1.1);
 }
 
 .nicht-bewertet-btn.selected {

@@ -1,6 +1,8 @@
-// Globale Variablen für Datenspeicherung
+// Globale Variablen für Datenspeicherung - KORRIGIERT
 let currentUser = null;
-let users = [
+
+// Benutzer-Daten mit globalem Zugriff
+window.users = [
     { email: 'admin@schule.de', password: 'admin123', role: 'admin', name: 'Administrator' },
     { email: 'riffel@schule.de', password: 'lehrer123', role: 'lehrer', name: 'Riffel' },
     { email: 'kretz@schule.de', password: 'lehrer123', role: 'lehrer', name: 'Kretz' },
@@ -9,7 +11,8 @@ let users = [
     { email: 'heiler@schule.de', password: 'lehrer123', role: 'lehrer', name: 'Heiler' }
 ];
 
-let alleFaecherGlobal = {
+// Alle anderen Daten ebenfalls global verfügbar machen
+window.alleFaecherGlobal = {
     'D': 'Deutsch',
     'M': 'Mathematik',
     'E': 'Englisch',
@@ -29,7 +32,7 @@ let alleFaecherGlobal = {
     'ALL': 'Allgemein'
 };
 
-let bewertungsCheckpoints = {
+window.bewertungsCheckpoints = {
     'Fachliches Arbeiten': [
         'Du arbeitest konzentriert und ausdauernd',
         'Du sammelst Informationen zielgerichtet',
@@ -72,29 +75,98 @@ let bewertungsCheckpoints = {
     ]
 };
 
-let themen = [
+window.themen = [
     { name: 'Klimawandel', ersteller: 'System', faecher: ['BIO', 'G'] },
     { name: 'Digitalisierung', ersteller: 'System', faecher: ['IT', 'ALL'] },
     { name: 'Nachhaltigkeit', ersteller: 'System', faecher: ['BIO', 'G', 'WBS'] }
 ];
-let gruppen = [];
-let bewertungen = [];
-let vorlagen = {};
-let news = [];
-let schuljahr = '2025/26';
-let briefvorlage = {
+
+window.gruppen = [];
+window.bewertungen = [];
+window.vorlagen = {};
+window.news = [];
+window.schuljahr = '2025/26';
+
+window.briefvorlage = {
     anrede: 'Liebe/r [NAME],\n\nim Rahmen des Projekts "Zeig, was du kannst!" hast du folgende Stärken gezeigt:',
     schluss: 'Wir gratulieren dir zu diesen Leistungen und freuen uns auf weitere erfolgreiche Projekte.\n\nMit freundlichen Grüßen\nDein Lehrerteam'
 };
-let staerkenFormulierungen = {};
+
+window.staerkenFormulierungen = {};
+
+// Lokale Referenzen für Rückwärtskompatibilität
+let users = window.users;
+let alleFaecherGlobal = window.alleFaecherGlobal;
+let bewertungsCheckpoints = window.bewertungsCheckpoints;
+let themen = window.themen;
+let gruppen = window.gruppen;
+let bewertungen = window.bewertungen;
+let vorlagen = window.vorlagen;
+let news = window.news;
+let schuljahr = window.schuljahr;
+let briefvorlage = window.briefvorlage;
+let staerkenFormulierungen = window.staerkenFormulierungen;
+
 let aktuelleGruppeEdit = null;
 
-// App-Initialisierung
+// App-Initialisierung - VERBESSERT
 function initializeApp() {
-    loadNews();
-    loadThemen();
-    loadSchuelerLehrerAuswahl();
-    initializeDemoData();
+    console.log('🚀 Initialisiere App...');
+    
+    try {
+        loadNews();
+        loadThemen();
+        loadSchuelerLehrerAuswahl();
+        initializeDemoData();
+        
+        // Warte auf Firebase falls verfügbar
+        if (window.firebaseInitialized) {
+            console.log('🔥 Firebase bereits initialisiert');
+            syncWithFirebase();
+        } else {
+            // Event-Listener für Firebase
+            window.addEventListener('firebaseReady', () => {
+                console.log('🔥 Firebase ready - synchronisiere Daten');
+                syncWithFirebase();
+            });
+        }
+        
+        console.log('✅ App erfolgreich initialisiert');
+    } catch (error) {
+        console.error('❌ Fehler bei App-Initialisierung:', error);
+    }
+}
+
+// Firebase-Synchronisation
+async function syncWithFirebase() {
+    if (!window.FirebaseClient || !window.firebaseInitialized) {
+        return;
+    }
+    
+    try {
+        console.log('🔄 Synchronisiere mit Firebase...');
+        
+        // Lade App-Einstellungen falls Admin
+        if (currentUser && currentUser.role === 'admin') {
+            const settingsResult = await window.FirebaseClient.load('settings');
+            if (settingsResult.success && settingsResult.data.length > 0) {
+                const settings = settingsResult.data[0];
+                if (settings.alleFaecherGlobal) {
+                    window.alleFaecherGlobal = settings.alleFaecherGlobal;
+                    alleFaecherGlobal = settings.alleFaecherGlobal;
+                }
+                if (settings.bewertungsCheckpoints) {
+                    window.bewertungsCheckpoints = settings.bewertungsCheckpoints;
+                    bewertungsCheckpoints = settings.bewertungsCheckpoints;
+                }
+                console.log('⚙️ App-Einstellungen aus Firebase geladen');
+            }
+        }
+        
+        console.log('✅ Firebase-Synchronisation abgeschlossen');
+    } catch (error) {
+        console.warn('⚠️ Firebase-Synchronisation fehlgeschlagen:', error);
+    }
 }
 
 // Tab-Navigation
@@ -109,15 +181,19 @@ function openTab(tabName) {
     event.target.classList.add('active');
     
     // Tab-spezifische Inhalte laden
-    if (tabName === 'news') loadNews();
-    if (tabName === 'themen') loadThemen();
-    if (tabName === 'gruppen') loadGruppen();
-    if (tabName === 'lehrer') loadLehrer();
-    if (tabName === 'daten') loadDatenverwaltung();
-    if (tabName === 'bewerten') loadBewertungen();
-    if (tabName === 'vorlagen') loadVorlagen();
-    if (tabName === 'uebersicht') loadUebersicht();
-    if (tabName === 'adminvorlagen') loadAdminVorlagen();
+    try {
+        if (tabName === 'news') loadNews();
+        if (tabName === 'themen') loadThemen();
+        if (tabName === 'gruppen') loadGruppen();
+        if (tabName === 'lehrer') loadLehrer();
+        if (tabName === 'daten') loadDatenverwaltung();
+        if (tabName === 'bewerten') loadBewertungen();
+        if (tabName === 'vorlagen') loadVorlagen();
+        if (tabName === 'uebersicht') loadUebersicht();
+        if (tabName === 'adminvorlagen') loadAdminVorlagen();
+    } catch (error) {
+        console.error(`❌ Fehler beim Laden von Tab ${tabName}:`, error);
+    }
 }
 
 // Gruppen-System
@@ -246,6 +322,11 @@ function gruppeErstellen() {
     };
     gruppen.push(gruppe);
     
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        window.FirebaseClient.save('gruppen', gruppe);
+    }
+    
     // News für jeden betroffenen Lehrer erstellen
     const lehrer = [...new Set(schueler.map(s => s.lehrer))];
     lehrer.forEach(lehrerName => {
@@ -360,6 +441,11 @@ function gruppeEditSpeichern() {
     gruppen[aktuelleGruppeEdit].thema = thema;
     gruppen[aktuelleGruppeEdit].schueler = schueler;
     
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        window.FirebaseClient.save('gruppen', gruppen[aktuelleGruppeEdit], gruppen[aktuelleGruppeEdit].id);
+    }
+    
     addNews('Gruppe bearbeitet', `Die Gruppe "${thema}" wurde aktualisiert.`);
     
     gruppeEditAbbrechen();
@@ -376,6 +462,13 @@ function gruppeLoeschen(index) {
     if (confirm('Gruppe wirklich löschen?')) {
         const gruppe = gruppen[index];
         gruppen.splice(index, 1);
+        
+        // Firebase aktualisieren falls verfügbar
+        if (window.FirebaseClient && window.firebaseInitialized) {
+            // In einer echten Implementation würde hier das spezifische Dokument gelöscht
+            window.FirebaseClient.save('gruppen', gruppen);
+        }
+        
         addNews('Gruppe gelöscht', `Die Gruppe "${gruppe.thema}" wurde gelöscht.`);
         loadGruppen();
     }
@@ -418,12 +511,19 @@ function lehrerHinzufuegen() {
         return;
     }
     
-    users.push({
+    const neuerLehrer = {
         email,
         password,
         role: 'lehrer',
         name
-    });
+    };
+    
+    users.push(neuerLehrer);
+    
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        window.FirebaseClient.save('users', neuerLehrer);
+    }
     
     // Felder zurücksetzen
     document.getElementById('lehrerName').value = '';
@@ -488,6 +588,11 @@ function lehrerSpeichern(alterEmail) {
         users[lehrerIndex].email = email;
         users[lehrerIndex].password = password;
         
+        // Firebase speichern falls verfügbar
+        if (window.FirebaseClient && window.firebaseInitialized) {
+            window.FirebaseClient.save('users', users[lehrerIndex]);
+        }
+        
         addNews('Lehrer aktualisiert', `Daten von ${name} wurden geändert.`);
         document.querySelector('.modal').remove();
         loadLehrer();
@@ -501,6 +606,12 @@ function lehrerLoeschen(email) {
         if (index > -1) {
             const name = users[index].name;
             users.splice(index, 1);
+            
+            // Firebase aktualisieren falls verfügbar
+            if (window.FirebaseClient && window.firebaseInitialized) {
+                window.FirebaseClient.save('users', users);
+            }
+            
             loadLehrer();
             loadSchuelerLehrerAuswahl();
             addNews('Lehrer gelöscht', `${name} wurde entfernt.`);
@@ -541,12 +652,34 @@ function loadFaecherVerwaltung() {
 
 function updateFachName(kuerzel, neuerName) {
     alleFaecherGlobal[kuerzel] = neuerName;
+    window.alleFaecherGlobal[kuerzel] = neuerName;
+    
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        const settings = {
+            alleFaecherGlobal: window.alleFaecherGlobal,
+            lastUpdate: new Date().toISOString()
+        };
+        window.FirebaseClient.save('settings', settings, 'app-settings');
+    }
+    
     addNews('Fach umbenannt', `Fach ${kuerzel} wurde in "${neuerName}" umbenannt.`, false, 'Administrator');
 }
 
 function fachLoeschen(kuerzel) {
     if (confirm(`Fach "${alleFaecherGlobal[kuerzel]}" wirklich löschen?`)) {
         delete alleFaecherGlobal[kuerzel];
+        delete window.alleFaecherGlobal[kuerzel];
+        
+        // Firebase speichern falls verfügbar
+        if (window.FirebaseClient && window.firebaseInitialized) {
+            const settings = {
+                alleFaecherGlobal: window.alleFaecherGlobal,
+                lastUpdate: new Date().toISOString()
+            };
+            window.FirebaseClient.save('settings', settings, 'app-settings');
+        }
+        
         loadFaecherVerwaltung();
         addNews('Fach gelöscht', `Fach ${kuerzel} wurde entfernt.`, false, 'Administrator');
     }
@@ -567,6 +700,17 @@ function neuesFachHinzufuegen() {
     }
     
     alleFaecherGlobal[kuerzel] = name;
+    window.alleFaecherGlobal[kuerzel] = name;
+    
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        const settings = {
+            alleFaecherGlobal: window.alleFaecherGlobal,
+            lastUpdate: new Date().toISOString()
+        };
+        window.FirebaseClient.save('settings', settings, 'app-settings');
+    }
+    
     document.getElementById('neuesFachKuerzel').value = '';
     document.getElementById('neuesFachName').value = '';
     
@@ -614,16 +758,40 @@ function loadCheckpointsVerwaltung() {
 
 function updateCheckpoint(kategorie, index, neuerText) {
     bewertungsCheckpoints[kategorie][index] = neuerText;
+    window.bewertungsCheckpoints[kategorie][index] = neuerText;
+    
     // Auch Stärkenformulierungen aktualisieren
     const key = `${kategorie}_${index}`;
     if (staerkenFormulierungen[key]) {
         staerkenFormulierungen[key] = neuerText;
+        window.staerkenFormulierungen[key] = neuerText;
+    }
+    
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        const settings = {
+            bewertungsCheckpoints: window.bewertungsCheckpoints,
+            staerkenFormulierungen: window.staerkenFormulierungen,
+            lastUpdate: new Date().toISOString()
+        };
+        window.FirebaseClient.save('settings', settings, 'app-settings');
     }
 }
 
 function checkpointLoeschen(kategorie, index) {
     if (confirm('Checkpoint wirklich löschen?')) {
         bewertungsCheckpoints[kategorie].splice(index, 1);
+        window.bewertungsCheckpoints[kategorie].splice(index, 1);
+        
+        // Firebase speichern falls verfügbar
+        if (window.FirebaseClient && window.firebaseInitialized) {
+            const settings = {
+                bewertungsCheckpoints: window.bewertungsCheckpoints,
+                lastUpdate: new Date().toISOString()
+            };
+            window.FirebaseClient.save('settings', settings, 'app-settings');
+        }
+        
         loadCheckpointsVerwaltung();
     }
 }
@@ -632,12 +800,25 @@ function neuerCheckpoint(kategorie) {
     const text = prompt(`Neuer Checkpoint für ${kategorie}:`);
     if (text && text.trim()) {
         bewertungsCheckpoints[kategorie].push(text.trim());
-        loadCheckpointsVerwaltung();
+        window.bewertungsCheckpoints[kategorie].push(text.trim());
         
         // Stärkenformulierung hinzufügen
         const index = bewertungsCheckpoints[kategorie].length - 1;
         const key = `${kategorie}_${index}`;
         staerkenFormulierungen[key] = text.trim();
+        window.staerkenFormulierungen[key] = text.trim();
+        
+        // Firebase speichern falls verfügbar
+        if (window.FirebaseClient && window.firebaseInitialized) {
+            const settings = {
+                bewertungsCheckpoints: window.bewertungsCheckpoints,
+                staerkenFormulierungen: window.staerkenFormulierungen,
+                lastUpdate: new Date().toISOString()
+            };
+            window.FirebaseClient.save('settings', settings, 'app-settings');
+        }
+        
+        loadCheckpointsVerwaltung();
     }
 }
 
@@ -700,9 +881,19 @@ function loadBriefvorlageEditor() {
 
 function updateStaerkenFormulierung(key, value) {
     staerkenFormulierungen[key] = value;
+    window.staerkenFormulierungen[key] = value;
 }
 
 function staerkenFormulierungenSpeichern() {
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        const settings = {
+            staerkenFormulierungen: window.staerkenFormulierungen,
+            lastUpdate: new Date().toISOString()
+        };
+        window.FirebaseClient.save('settings', settings, 'app-settings');
+    }
+    
     addNews('Vorlagen aktualisiert', 'Die Standardformulierungen wurden gespeichert.', false, 'Administrator');
     alert('Formulierungen gespeichert!');
 }
@@ -710,6 +901,17 @@ function staerkenFormulierungenSpeichern() {
 function briefvorlageSpeichern() {
     briefvorlage.anrede = document.getElementById('briefAnrede').value;
     briefvorlage.schluss = document.getElementById('briefSchluss').value;
+    
+    window.briefvorlage = briefvorlage;
+    
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        const settings = {
+            briefvorlage: window.briefvorlage,
+            lastUpdate: new Date().toISOString()
+        };
+        window.FirebaseClient.save('settings', settings, 'app-settings');
+    }
     
     addNews('Briefvorlage aktualisiert', 'Die Briefvorlage wurde angepasst.', false, 'Administrator');
     alert('Briefvorlage gespeichert!');
@@ -895,6 +1097,17 @@ function loadDatenverwaltung() {
 
 function schuljahrSpeichern() {
     schuljahr = document.getElementById('schuljahr').value;
+    window.schuljahr = schuljahr;
+    
+    // Firebase speichern falls verfügbar
+    if (window.FirebaseClient && window.firebaseInitialized) {
+        const settings = {
+            schuljahr: window.schuljahr,
+            lastUpdate: new Date().toISOString()
+        };
+        window.FirebaseClient.save('settings', settings, 'app-settings');
+    }
+    
     addNews('Schuljahr geändert', `Das Schuljahr wurde auf ${schuljahr} gesetzt.`);
     loadDatenverwaltung();
 }
@@ -915,24 +1128,53 @@ function datenLoeschen(typ) {
         switch(typ) {
             case 'bewertungen':
                 bewertungen = [];
+                window.bewertungen = [];
                 break;
             case 'gruppen':
                 gruppen = [];
+                window.gruppen = [];
                 break;
             case 'news':
                 news = [];
+                window.news = [];
                 break;
             case 'alle':
                 bewertungen = [];
                 gruppen = [];
                 news = [];
+                window.bewertungen = [];
+                window.gruppen = [];
+                window.news = [];
                 themen = [
                     { name: 'Klimawandel', ersteller: 'System', faecher: ['BIO', 'G'] },
                     { name: 'Digitalisierung', ersteller: 'System', faecher: ['IT', 'ALL'] },
                     { name: 'Nachhaltigkeit', ersteller: 'System', faecher: ['BIO', 'G', 'WBS'] }
                 ];
+                window.themen = themen;
                 break;
         }
+        
+        // Firebase aktualisieren falls verfügbar
+        if (window.FirebaseClient && window.firebaseInitialized) {
+            switch(typ) {
+                case 'bewertungen':
+                    window.FirebaseClient.save('bewertungen', []);
+                    break;
+                case 'gruppen':
+                    window.FirebaseClient.save('gruppen', []);
+                    break;
+                case 'news':
+                    window.FirebaseClient.save('news', []);
+                    break;
+                case 'alle':
+                    window.FirebaseClient.save('bewertungen', []);
+                    window.FirebaseClient.save('gruppen', []);
+                    window.FirebaseClient.save('news', []);
+                    window.FirebaseClient.save('themen', window.themen);
+                    break;
+            }
+        }
+        
         addNews('Daten gelöscht', `${nachricht[typ]} wurden gelöscht.`, true);
         loadDatenverwaltung();
     }
@@ -940,87 +1182,130 @@ function datenLoeschen(typ) {
 
 // Demo-Daten initialisieren
 function initializeDemoData() {
-    // Demo-Vorlagen erstellen
-    vorlagen['riffel@schule.de'] = [
-        {
-            name: 'Geschichte Standard',
-            kategorien: [
-                { name: 'Reflexion', gewichtung: 30 },
-                { name: 'Inhalt', gewichtung: 40 },
-                { name: 'Präsentation', gewichtung: 30 }
-            ]
+    console.log('🎯 Initialisiere Demo-Daten...');
+    
+    try {
+        // Demo-Vorlagen erstellen
+        vorlagen['riffel@schule.de'] = [
+            {
+                name: 'Geschichte Standard',
+                kategorien: [
+                    { name: 'Reflexion', gewichtung: 30 },
+                    { name: 'Inhalt', gewichtung: 40 },
+                    { name: 'Präsentation', gewichtung: 30 }
+                ]
+            }
+        ];
+        
+        vorlagen['kretz@schule.de'] = [
+            {
+                name: 'Sport Handball',
+                kategorien: [
+                    { name: 'Reflexion', gewichtung: 30 },
+                    { name: 'Technik', gewichtung: 35 },
+                    { name: 'Taktik', gewichtung: 35 }
+                ]
+            }
+        ];
+        
+        vorlagen['toellner@schule.de'] = [
+            {
+                name: 'Mathematik',
+                kategorien: [
+                    { name: 'Reflexion', gewichtung: 30 },
+                    { name: 'Rechnung', gewichtung: 70 }
+                ]
+            }
+        ];
+        
+        window.vorlagen = vorlagen;
+        
+        // Demo-News nur wenn noch keine vorhanden
+        if (news.length === 0) {
+            addNews('Willkommen', 'Willkommen im Bewertungstool "Zeig, was du kannst!" für das Schuljahr 2025/26', false, 'System');
+            addNews('System bereit', 'Das Bewertungssystem ist einsatzbereit. Lehrer können Gruppen erstellen und Schüler bewerten.', true, 'Administrator');
         }
-    ];
-    
-    vorlagen['kretz@schule.de'] = [
-        {
-            name: 'Sport Handball',
-            kategorien: [
-                { name: 'Reflexion', gewichtung: 30 },
-                { name: 'Technik', gewichtung: 35 },
-                { name: 'Taktik', gewichtung: 35 }
-            ]
+        
+        // Demo-Gruppe erstellen (nur wenn noch keine vorhanden)
+        if (gruppen.length === 0) {
+            gruppen.push({
+                thema: 'Klimawandel und Nachhaltigkeit',
+                schueler: [
+                    { name: 'Max Mustermann', lehrer: 'Riffel', fach: 'G' },
+                    { name: 'Anna Schmidt', lehrer: 'Kretz', fach: 'SP' },
+                    { name: 'Tom Weber', lehrer: 'Riffel', fach: 'G' },
+                    { name: 'Lisa Müller', lehrer: 'Töllner', fach: 'M' }
+                ],
+                id: 1000,
+                erstellt: new Date().toLocaleDateString('de-DE')
+            });
+            
+            window.gruppen = gruppen;
         }
-    ];
-    
-    vorlagen['toellner@schule.de'] = [
-        {
-            name: 'Mathematik',
-            kategorien: [
-                { name: 'Reflexion', gewichtung: 30 },
-                { name: 'Rechnung', gewichtung: 70 }
-            ]
+        
+        // Demo-Bewertung (nur wenn noch keine vorhanden)
+        if (bewertungen.length === 0) {
+            bewertungen.push({
+                schuelerId: '1000-Max-Mustermann',
+                schuelerName: 'Max Mustermann',
+                thema: 'Klimawandel und Nachhaltigkeit',
+                lehrer: 'Riffel',
+                vorlage: 'Geschichte Standard',
+                noten: [2.0, 1.5, 2.5],
+                endnote: 2.0,
+                datum: new Date().toLocaleDateString('de-DE'),
+                staerken: {
+                    'Fachliches Arbeiten': [0, 2],
+                    'Zusammenarbeit': [1],
+                    'Kommunikation': [0, 4],
+                    'Eigenständigkeit': [1, 3],
+                    'Reflexionsfähigkeit': [0, 1],
+                    'Persönlichkeitsentwicklung': [2]
+                },
+                freitext: 'Max zeigt sehr gute analytische Fähigkeiten.'
+            });
+            
+            window.bewertungen = bewertungen;
         }
-    ];
-    
-    // Demo-News
-    addNews('Willkommen', 'Willkommen im Bewertungstool "Zeig, was du kannst!" für das Schuljahr 2025/26', false, 'System');
-    addNews('System bereit', 'Das Bewertungssystem ist einsatzbereit. Lehrer können Gruppen erstellen und Schüler bewerten.', true, 'Administrator');
-    
-    // Demo-Gruppe erstellen
-    gruppen.push({
-        thema: 'Klimawandel und Nachhaltigkeit',
-        schueler: [
-            { name: 'Max Mustermann', lehrer: 'Riffel', fach: 'G' },
-            { name: 'Anna Schmidt', lehrer: 'Kretz', fach: 'SP' },
-            { name: 'Tom Weber', lehrer: 'Riffel', fach: 'G' },
-            { name: 'Lisa Müller', lehrer: 'Töllner', fach: 'M' }
-        ],
-        id: 1000,
-        erstellt: new Date().toLocaleDateString('de-DE')
-    });
-    
-    // Demo-Bewertung
-    bewertungen.push({
-        schuelerId: '1000-Max-Mustermann',
-        schuelerName: 'Max Mustermann',
-        thema: 'Klimawandel und Nachhaltigkeit',
-        lehrer: 'Riffel',
-        vorlage: 'Geschichte Standard',
-        noten: [2.0, 1.5, 2.5],
-        endnote: 2.0,
-        datum: new Date().toLocaleDateString('de-DE'),
-        staerken: {
-            'Fachliches Arbeiten': [0, 2],
-            'Zusammenarbeit': [1],
-            'Kommunikation': [0, 4],
-            'Eigenständigkeit': [1, 3],
-            'Reflexionsfähigkeit': [0, 1],
-            'Persönlichkeitsentwicklung': [2]
-        },
-        freitext: 'Max zeigt sehr gute analytische Fähigkeiten.'
-    });
-    
-    // Demo-Stärkenformulierungen initialisieren (ohne automatische Namens-Einfügung)
-    Object.keys(bewertungsCheckpoints).forEach(kategorie => {
-        bewertungsCheckpoints[kategorie].forEach((text, index) => {
-            const key = `${kategorie}_${index}`;
-            staerkenFormulierungen[key] = text;
-        });
-    });
+        
+        // Demo-Stärkenformulierungen initialisieren (ohne automatische Namens-Einfügung)
+        if (Object.keys(staerkenFormulierungen).length === 0) {
+            Object.keys(bewertungsCheckpoints).forEach(kategorie => {
+                bewertungsCheckpoints[kategorie].forEach((text, index) => {
+                    const key = `${kategorie}_${index}`;
+                    staerkenFormulierungen[key] = text;
+                });
+            });
+            
+            window.staerkenFormulierungen = staerkenFormulierungen;
+        }
+        
+        console.log('✅ Demo-Daten erfolgreich initialisiert');
+    } catch (error) {
+        console.error('❌ Fehler bei Demo-Daten-Initialisierung:', error);
+    }
 }
 
+// Globale currentUser für andere Module verfügbar machen
+window.getCurrentUser = () => currentUser;
+
 // Initialize App when DOM is loaded
-window.addEventListener('load', function() {
-    initializeDemoData();
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 DOM geladen - starte App-Initialisierung');
+    
+    // Warte kurz falls andere Scripte noch laden
+    setTimeout(() => {
+        initializeApp();
+    }, 100);
 });
+
+// Auch beim window.load Event sicherheitshalber
+window.addEventListener('load', function() {
+    if (!window.appInitialized) {
+        console.log('🔄 Backup-Initialisierung gestartet');
+        initializeApp();
+        window.appInitialized = true;
+    }
+});
+
+console.log('🚀 Main.js geladen und bereit');

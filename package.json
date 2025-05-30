@@ -1,0 +1,54 @@
+{
+  "name": "zeig-was-du-kannst",
+  "version": "1.0.0",
+  "description": "Bewertungssystem für Schulprojekte - Zeig, was du kannst!",
+  "main": "index.html",
+  "scripts": {
+    "build": "node setup-env.js",
+    "dev": "node setup-env.js && python -m http.server 8000",
+    "test": "echo \"No tests specified\" && exit 0",
+    "deploy": "npm run build"
+  },
+  "keywords": [
+    "schule",
+    "bewertung",
+    "projekte",
+    "firebase",
+    "offline",
+    "webapp"
+  ],
+  "author": "Realschule Bad Schönborn",
+  "license": "MIT",
+  "devDependencies": {
+    "node": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/zeig-was-du-kannst.git"
+  },
+  "netlify": {
+    "build": {
+      "command": "npm run build",
+      "publish": "."
+    },
+    "environment": {
+      "NODE_VERSION": "18"
+    }
+  },
+  "browser": {
+    "fs": false,
+    "path": false,
+    "os": false
+  },
+  "files": [
+    "*.html",
+    "*.css",
+    "*.js",
+    "*.md",
+    "netlify.toml",
+    "!node_modules"
+  ]
+}

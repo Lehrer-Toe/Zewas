@@ -17,16 +17,23 @@ async function initializeFirebase() {
         if (typeof window !== 'undefined' && window.FIREBASE_CONFIG) {
             console.log('🔥 Initialisiere Firebase...');
             
-            // Firebase SDK laden
-            if (typeof firebase === 'undefined') {
+            // Firebase SDK laden (falls noch nicht geladen)
+            if (typeof firebase === 'undefined' || firebase === null) {
                 console.log('📦 Firebase SDK wird geladen...');
                 await loadFirebaseSDK();
             }
             
-            // Firebase App initialisieren
+            // Prüfe ob Firebase jetzt verfügbar ist
+            if (typeof firebase === 'undefined' || firebase === null) {
+                throw new Error('Firebase SDK konnte nicht geladen werden');
+            }
+            
+            // Firebase App initialisieren (nur wenn noch nicht initialisiert)
             if (!firebase.apps || firebase.apps.length === 0) {
                 const app = firebase.initializeApp(window.FIREBASE_CONFIG);
                 console.log('✅ Firebase App initialisiert');
+            } else {
+                console.log('✅ Firebase App bereits initialisiert');
             }
             
             // Services initialisieren
@@ -76,7 +83,10 @@ async function initializeFirebase() {
 // Firebase SDK dynamisch laden
 async function loadFirebaseSDK() {
     return new Promise((resolve, reject) => {
-        if (typeof firebase !== 'undefined') {
+        // Prüfe ob Firebase bereits global verfügbar ist
+        if (typeof window.firebase !== 'undefined') {
+            firebase = window.firebase;
+            console.log('✅ Firebase SDK bereits verfügbar');
             resolve();
             return;
         }
@@ -103,19 +113,20 @@ async function loadFirebaseSDK() {
                 
                 if (loadedCount === totalScripts) {
                     setTimeout(() => {
-                        if (typeof firebase !== 'undefined') {
+                        if (typeof window.firebase !== 'undefined') {
+                            firebase = window.firebase;
                             console.log('✅ Firebase SDK vollständig geladen');
                             resolve();
                         } else {
-                            reject(new Error('Firebase SDK nicht verfügbar'));
+                            reject(new Error('Firebase SDK nicht verfügbar nach dem Laden'));
                         }
-                    }, 100);
+                    }, 200); // Etwas längere Wartezeit
                 }
             };
             
             script.onerror = (error) => {
                 console.error(`❌ Fehler beim Laden von ${src}:`, error);
-                reject(new Error('Firebase SDK konnte nicht geladen werden'));
+                reject(new Error(`Firebase SDK konnte nicht geladen werden: ${src}`));
             };
             
             document.head.appendChild(script);
@@ -448,11 +459,13 @@ window.FirebaseClient = {
     createUser: createUser
 };
 
-// Automatische Initialisierung
+// Automatische Initialisierung mit besserer Fehlerbehandlung
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeFirebase);
+    document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initializeFirebase, 100); // Kurze Verzögerung für bessere Kompatibilität
+    });
 } else {
-    initializeFirebase();
+    setTimeout(initializeFirebase, 100);
 }
 
 console.log('🔧 Firebase Client (Online-Only) geladen');

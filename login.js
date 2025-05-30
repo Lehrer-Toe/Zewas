@@ -1,4 +1,4 @@
-// Login-System mit Firebase Authentication Integration - KORRIGIERT
+// Login-System - NUR Firebase Authentication
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔐 Login-System wird initialisiert...');
     
@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Status-Updates für Login-Screen
 function setupLoginStatusUpdates() {
-    // Überwache Firebase-Initialisierung
     const checkFirebaseStatus = () => {
         const statusIndicator = document.getElementById('statusIndicator');
         const connectionStatus = document.getElementById('connectionStatus');
@@ -21,17 +20,12 @@ function setupLoginStatusUpdates() {
         if (!statusIndicator || !connectionStatus) return;
         
         if (window.firebaseInitialized) {
-            statusIndicator.textContent = '🔥 Firebase bereit - Anmeldung möglich';
+            statusIndicator.textContent = '🔥 Firebase verbunden - Anmeldung möglich';
             connectionStatus.style.background = '#d4edda';
             connectionStatus.style.color = '#155724';
             connectionStatus.style.border = '1px solid #c3e6cb';
-        } else if (window.firebaseConfigValid === false) {
-            statusIndicator.textContent = '🏠 Lokaler Modus - Anmeldung möglich';
-            connectionStatus.style.background = '#cce7ff';
-            connectionStatus.style.color = '#004085';
-            connectionStatus.style.border = '1px solid #66b3ff';
         } else {
-            statusIndicator.textContent = '🔄 Initialisierung läuft...';
+            statusIndicator.textContent = '⏳ Verbindung zu Firebase wird hergestellt...';
             connectionStatus.style.background = '#fff3cd';
             connectionStatus.style.color = '#856404';
             connectionStatus.style.border = '1px solid #ffeaa7';
@@ -43,22 +37,21 @@ function setupLoginStatusUpdates() {
     
     // Event Listeners
     window.addEventListener('firebaseReady', () => {
-        console.log('🔥 Firebase ready - Login bereit');
+        console.log('🔥 Firebase bereit');
         checkFirebaseStatus();
     });
     
-    window.addEventListener('localModeReady', () => {
-        console.log('🏠 Lokaler Modus ready - Login bereit');
-        checkFirebaseStatus();
-    });
-    
-    // Backup: Regelmäßige Status-Checks
+    // Regelmäßige Status-Checks
     const statusInterval = setInterval(() => {
         checkFirebaseStatus();
-        
-        // Stop interval nach 30 Sekunden
-        setTimeout(() => clearInterval(statusInterval), 30000);
     }, 1000);
+    
+    // Stop interval wenn Firebase bereit ist
+    setTimeout(() => {
+        if (window.firebaseInitialized) {
+            clearInterval(statusInterval);
+        }
+    }, 10000);
 }
 
 async function loginUser() {
@@ -77,30 +70,19 @@ async function loginUser() {
     loginBtn.disabled = true;
     
     try {
+        // Warte auf Firebase-Initialisierung
+        if (!window.firebaseInitialized) {
+            console.log('⏳ Warte auf Firebase...');
+            await waitForFirebase(5000); // 5 Sekunden warten
+        }
+        
+        if (!window.firebaseInitialized) {
+            throw new Error('Firebase konnte nicht initialisiert werden. Bitte laden Sie die Seite neu.');
+        }
+        
         console.log('🔐 Anmeldeversuch für:', email);
         
-        let loginResult = null;
-        
-        // Firebase Authentication verwenden falls verfügbar
-        if (window.FirebaseClient && window.firebaseInitialized) {
-            console.log('🔥 Firebase-Login wird versucht...');
-            loginResult = await window.FirebaseClient.login(email, password);
-        } else if (window.firebaseConfigValid === false) {
-            // Explizit lokaler Modus
-            console.log('🏠 Lokaler Login (Firebase deaktiviert)');
-            loginResult = loginUserLocal(email, password);
-        } else {
-            // Warte kurz auf Firebase, dann Fallback
-            console.log('⏳ Warte auf Firebase-Initialisierung...');
-            await waitForFirebaseOrTimeout(2000);
-            
-            if (window.firebaseInitialized) {
-                loginResult = await window.FirebaseClient.login(email, password);
-            } else {
-                console.log('🔄 Firebase-Timeout - verwende lokalen Login');
-                loginResult = loginUserLocal(email, password);
-            }
-        }
+        const loginResult = await window.FirebaseClient.login(email, password);
         
         if (loginResult && loginResult.success) {
             // Globale currentUser Variable setzen
@@ -108,7 +90,10 @@ async function loginUser() {
             window.currentUser = loginResult.user;
             
             showApp();
-            console.log('✅ Login erfolgreich:', currentUser.name, `(${window.firebaseInitialized ? 'Firebase' : 'Lokal'})`);
+            console.log('✅ Login erfolgreich:', currentUser.name);
+            
+            // Initiale Daten laden
+            await loadInitialData();
             
             // Admin-Setup prüfen
             if (currentUser.role === 'admin') {
@@ -121,19 +106,7 @@ async function loginUser() {
         }
     } catch (error) {
         console.error('❌ Login-Fehler:', error);
-        
-        // Als letzter Ausweg: Lokaler Login
-        console.log('🔄 Versuche lokalen Login als Fallback...');
-        const fallbackResult = loginUserLocal(email, password);
-        
-        if (fallbackResult.success) {
-            currentUser = fallbackResult.user;
-            window.currentUser = fallbackResult.user;
-            showApp();
-            console.log('✅ Fallback-Login erfolgreich:', currentUser.name);
-        } else {
-            showError('Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Eingaben.');
-        }
+        showError(error.message || 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Internetverbindung.');
     } finally {
         // Loading-Anzeige zurücksetzen
         loginBtn.textContent = originalText;
@@ -141,9 +114,9 @@ async function loginUser() {
     }
 }
 
-// Warte auf Firebase mit Timeout
-function waitForFirebaseOrTimeout(timeoutMs) {
-    return new Promise((resolve) => {
+// Warte auf Firebase
+function waitForFirebase(timeoutMs) {
+    return new Promise((resolve, reject) => {
         if (window.firebaseInitialized) {
             resolve(true);
             return;
@@ -156,43 +129,10 @@ function waitForFirebaseOrTimeout(timeoutMs) {
                 resolve(true);
             } else if (Date.now() - startTime > timeoutMs) {
                 clearInterval(checkInterval);
-                resolve(false);
+                reject(new Error('Firebase-Timeout'));
             }
         }, 100);
     });
-}
-
-// Lokale Authentifizierung (Fallback)
-function loginUserLocal(email, password) {
-    console.log('🏠 Lokaler Login für:', email);
-    
-    // users Array aus main.js verwenden
-    if (!window.users || !Array.isArray(window.users)) {
-        console.error('❌ Lokale Benutzerdaten nicht verfügbar');
-        return {
-            success: false,
-            error: 'Lokale Daten nicht verfügbar'
-        };
-    }
-    
-    const user = window.users.find(u => u.email === email && u.password === password);
-    if (user) {
-        return {
-            success: true,
-            user: {
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                uid: `local-${user.email}`,
-                isLocal: true
-            }
-        };
-    } else {
-        return {
-            success: false,
-            error: 'Ungültige Anmeldedaten'
-        };
-    }
 }
 
 function showError(message) {
@@ -249,7 +189,7 @@ function showApp() {
         
         console.log('👨‍🏫 Lehrer-Interface aktiviert');
     } else {
-        console.warn('⚠️ Unbekannte Benutzerrolle:', currentUser.role);
+        console.error('⚠️ Unbekannte Benutzerrolle:', currentUser.role);
         showError('Unbekannte Benutzerrolle. Bitte kontaktieren Sie den Administrator.');
         return;
     }
@@ -257,15 +197,9 @@ function showApp() {
     // App initialisieren
     initializeApp();
     
-    // Firebase-Daten laden falls verfügbar
-    if (window.FirebaseClient && window.firebaseInitialized) {
-        loadFirebaseData();
-    }
-    
     // Connection Status in Header aktualisieren
     updateConnectionStatusInHeader();
     
-    // Erfolgreiche Anmeldung loggen
     console.log(`🚀 App für ${currentUser.name} (${currentUser.role}) gestartet`);
 }
 
@@ -287,131 +221,71 @@ function updateConnectionStatusInHeader() {
         connectionIcon.textContent = '🔥';
         connectionText.textContent = 'Firebase';
     } else {
-        connectionIcon.textContent = '🏠';
-        connectionText.textContent = 'Lokal';
+        connectionIcon.textContent = '⚠️';
+        connectionText.textContent = 'Offline';
     }
 }
 
-async function loadFirebaseData() {
+// Initiale Daten aus Firebase laden
+async function loadInitialData() {
     try {
-        console.log('📊 Lade Daten aus Firebase...');
+        console.log('📊 Lade initiale Daten aus Firebase...');
         
-        // Benutzer-spezifische Daten laden
-        if (currentUser.role === 'admin') {
-            // Admin lädt alle Daten
-            await loadAllFirebaseData();
-        } else {
-            // Lehrer lädt nur relevante Daten
-            await loadTeacherFirebaseData();
+        // Lade App-Einstellungen
+        const settingsResult = await window.FirebaseClient.load('settings');
+        if (settingsResult.success && settingsResult.data.length > 0) {
+            const settings = settingsResult.data.find(s => s.id === 'app-settings');
+            if (settings) {
+                if (settings.schuljahr) {
+                    window.schuljahr = settings.schuljahr;
+                    schuljahr = settings.schuljahr;
+                }
+                if (settings.alleFaecherGlobal) {
+                    window.alleFaecherGlobal = settings.alleFaecherGlobal;
+                    alleFaecherGlobal = settings.alleFaecherGlobal;
+                }
+                if (settings.bewertungsCheckpoints) {
+                    window.bewertungsCheckpoints = settings.bewertungsCheckpoints;
+                    bewertungsCheckpoints = settings.bewertungsCheckpoints;
+                }
+                if (settings.briefvorlage) {
+                    window.briefvorlage = settings.briefvorlage;
+                    briefvorlage = settings.briefvorlage;
+                }
+                if (settings.staerkenFormulierungen) {
+                    window.staerkenFormulierungen = settings.staerkenFormulierungen;
+                    staerkenFormulierungen = settings.staerkenFormulierungen;
+                }
+            }
         }
         
-        console.log('✅ Firebase-Daten geladen');
-    } catch (error) {
-        console.warn('⚠️ Firebase-Daten konnten nicht geladen werden:', error);
-        console.log('🔧 Verwende lokale Daten als Fallback');
-    }
-}
-
-async function loadAllFirebaseData() {
-    try {
-        // Alle Collections für Admin laden
-        const collections = ['users', 'themen', 'gruppen', 'bewertungen', 'news', 'settings'];
+        // Lade alle anderen Daten
+        const dataToLoad = {
+            'users': 'users',
+            'themen': 'themen',
+            'gruppen': 'gruppen',
+            'bewertungen': 'bewertungen',
+            'news': 'news',
+            'vorlagen': 'vorlagen'
+        };
         
-        for (const collection of collections) {
+        for (const [collection, globalVar] of Object.entries(dataToLoad)) {
             const result = await window.FirebaseClient.load(collection);
-            if (result.success && result.data) {
-                updateLocalData(collection, result.data);
+            if (result.success) {
+                window[globalVar] = result.data;
+                // Auch die lokalen Variablen aktualisieren
+                if (typeof window[globalVar] !== 'undefined') {
+                    eval(`${globalVar} = window.${globalVar}`);
+                }
+                console.log(`✅ ${collection} geladen (${result.data.length} Einträge)`);
             }
         }
+        
+        console.log('✅ Alle Daten geladen');
     } catch (error) {
-        console.error('❌ Fehler beim Laden der Admin-Daten:', error);
+        console.error('❌ Fehler beim Laden der Daten:', error);
+        showError('Fehler beim Laden der Daten. Bitte laden Sie die Seite neu.');
     }
-}
-
-async function loadTeacherFirebaseData() {
-    try {
-        // Nur relevante Daten für Lehrer laden
-        const themenResult = await window.FirebaseClient.load('themen');
-        if (themenResult.success) updateLocalData('themen', themenResult.data);
-        
-        const newsResult = await window.FirebaseClient.load('news');
-        if (newsResult.success) updateLocalData('news', newsResult.data);
-        
-        const gruppenResult = await window.FirebaseClient.load('gruppen', { lehrer: currentUser.name });
-        if (gruppenResult.success) updateLocalData('gruppen', gruppenResult.data);
-        
-        const bewertungenResult = await window.FirebaseClient.load('bewertungen', { lehrer: currentUser.name });
-        if (bewertungenResult.success) updateLocalData('bewertungen', bewertungenResult.data);
-        
-    } catch (error) {
-        console.error('❌ Fehler beim Laden der Lehrer-Daten:', error);
-    }
-}
-
-function updateLocalData(collection, data) {
-    if (!data) return;
-    
-    switch (collection) {
-        case 'users':
-            if (Array.isArray(data)) {
-                window.users = data;
-                users = data; // Globale Referenz aktualisieren
-            }
-            break;
-        case 'themen':
-            if (Array.isArray(data)) {
-                window.themen = data;
-                themen = data;
-            }
-            break;
-        case 'gruppen':
-            if (Array.isArray(data)) {
-                window.gruppen = data;
-                gruppen = data;
-            }
-            break;
-        case 'bewertungen':
-            if (Array.isArray(data)) {
-                window.bewertungen = data;
-                bewertungen = data;
-            }
-            break;
-        case 'news':
-            if (Array.isArray(data)) {
-                window.news = data;
-                news = data;
-            }
-            break;
-        case 'settings':
-            if (data && typeof data === 'object') {
-                // Settings können als Array oder Objekt kommen
-                const settingsData = Array.isArray(data) ? data[0] : data;
-                
-                if (settingsData.schuljahr) {
-                    window.schuljahr = settingsData.schuljahr;
-                    schuljahr = settingsData.schuljahr;
-                }
-                if (settingsData.alleFaecherGlobal) {
-                    window.alleFaecherGlobal = settingsData.alleFaecherGlobal;
-                    alleFaecherGlobal = settingsData.alleFaecherGlobal;
-                }
-                if (settingsData.bewertungsCheckpoints) {
-                    window.bewertungsCheckpoints = settingsData.bewertungsCheckpoints;
-                    bewertungsCheckpoints = settingsData.bewertungsCheckpoints;
-                }
-                if (settingsData.briefvorlage) {
-                    window.briefvorlage = settingsData.briefvorlage;
-                    briefvorlage = settingsData.briefvorlage;
-                }
-                if (settingsData.staerkenFormulierungen) {
-                    window.staerkenFormulierungen = settingsData.staerkenFormulierungen;
-                    staerkenFormulierungen = settingsData.staerkenFormulierungen;
-                }
-            }
-            break;
-    }
-    
-    console.log(`📊 ${collection} Daten aktualisiert (${Array.isArray(data) ? data.length : 'object'} Einträge)`);
 }
 
 // Admin-Setup prüfen
@@ -419,18 +293,22 @@ async function checkAdminSetup() {
     try {
         console.log('🔧 Prüfe Admin-Setup...');
         
-        // Warte auf das Admin-Setup-System
-        if (typeof window.AdminSetup !== 'undefined') {
-            await window.AdminSetup.checkAndRun();
-        } else {
-            // Fallback: Warte und versuche erneut
-            setTimeout(() => {
+        // Prüfe ob bereits Einstellungen vorhanden sind
+        const settingsResult = await window.FirebaseClient.load('settings');
+        if (!settingsResult.success || settingsResult.data.length === 0) {
+            console.log('🚀 Erstmalige Einrichtung erforderlich');
+            
+            // Lade Admin-Setup-Script
+            const script = document.createElement('script');
+            script.src = 'admin-setup.js';
+            script.onload = () => {
                 if (typeof window.AdminSetup !== 'undefined') {
                     window.AdminSetup.checkAndRun();
-                } else {
-                    console.warn('⚠️ Admin-Setup-System nicht verfügbar');
                 }
-            }, 2000);
+            };
+            document.head.appendChild(script);
+        } else {
+            console.log('✅ System bereits eingerichtet');
         }
     } catch (error) {
         console.warn('⚠️ Admin-Setup-Prüfung fehlgeschlagen:', error);
@@ -441,19 +319,10 @@ async function logout() {
     try {
         console.log('👋 Logout für:', currentUser?.name);
         
-        // Firebase Logout falls verfügbar
-        if (window.FirebaseClient && window.firebase && window.firebase.auth()) {
-            try {
-                await window.firebase.auth().signOut();
-                console.log('🔐 Firebase Logout erfolgreich');
-            } catch (firebaseLogoutError) {
-                console.warn('⚠️ Firebase Logout Warnung:', firebaseLogoutError);
-            }
-        }
-        
-        // Lokale Daten speichern
-        if (window.FirebaseClient) {
-            window.FirebaseClient.saveLocal();
+        // Firebase Logout
+        if (window.firebase && window.firebase.auth()) {
+            await window.firebase.auth().signOut();
+            console.log('🔐 Firebase Logout erfolgreich');
         }
         
     } catch (error) {
@@ -463,16 +332,13 @@ async function logout() {
         currentUser = null;
         window.currentUser = null;
         
-        // Alle Tabs verstecken
-        const allTabs = [
-            'newsTab', 'themenTab', 'gruppenTab', 'lehrerTab', 
-            'datenTab', 'bewertenTab', 'vorlagenTab', 'uebersichtTab', 'adminvorlagenTab'
-        ];
-        
-        allTabs.forEach(tabId => {
-            const tab = document.getElementById(tabId);
-            if (tab) tab.style.display = 'none';
-        });
+        // Daten löschen
+        window.users = [];
+        window.themen = [];
+        window.gruppen = [];
+        window.bewertungen = [];
+        window.news = [];
+        window.vorlagen = {};
         
         // Login-Screen anzeigen
         document.getElementById('loginScreen').style.display = 'flex';
@@ -521,6 +387,7 @@ async function checkExistingSession() {
                             window.currentUser = currentUser;
                             
                             showApp();
+                            await loadInitialData();
                             console.log('✅ Auto-Login erfolgreich:', currentUser.name);
                         } else {
                             console.warn('⚠️ Benutzerdaten nicht in Firestore gefunden');
@@ -530,11 +397,9 @@ async function checkExistingSession() {
                     }
                 }
             });
-        } else {
-            console.log('🏠 Kein Auto-Login verfügbar (lokaler Modus oder Firebase nicht bereit)');
         }
     } catch (error) {
-        console.log('🔧 Auto-Login nicht verfügbar:', error.message);
+        console.log('⚠️ Auto-Login nicht verfügbar:', error.message);
     }
 }
 
@@ -552,17 +417,4 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Debug-Informationen für Entwicklung
-if (window.DEVELOPMENT_MODE && window.DEVELOPMENT_MODE.enabled) {
-    window.debugLogin = {
-        loginUserLocal,
-        checkAdminSetup,
-        updateLocalData,
-        showError,
-        getCurrentUser: () => currentUser
-    };
-    
-    console.log('🐛 Debug-Login-Funktionen verfügbar unter window.debugLogin');
-}
-
-console.log('🔐 Login-System mit verbesserter Firebase-Integration geladen');
+console.log('🔐 Login-System (Online-Only) geladen');

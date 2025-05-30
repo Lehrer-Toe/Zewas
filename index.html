@@ -5,12 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zeig, was du kannst!</title>
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- Preload wichtige Scripte -->
+    <link rel="preload" href="env-config.js" as="script">
+    <link rel="preload" href="fireconfig.js" as="script">
+    <link rel="preload" href="fireclient.js" as="script">
+    
+    <!-- Meta Tags für bessere Performance -->
+    <meta name="description" content="Bewertungssystem für Schulprojekte - Zeig, was du kannst!">
+    <meta name="author" content="Realschule Bad Schönborn">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎺</text></svg>">
 </head>
 <body>
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(102, 126, 234, 0.9); color: white; display: flex; justify-content: center; align-items: center; z-index: 9999; font-size: 1.2rem;">
+        <div style="text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🎺</div>
+            <div>Zeig, was du kannst!</div>
+            <div style="font-size: 0.9rem; margin-top: 0.5rem;">Wird geladen...</div>
+        </div>
+    </div>
+
     <!-- Login Screen -->
     <div id="loginScreen" class="login-container">
         <div class="login-card">
             <h1>Zeig, was du kannst!</h1>
+            <div id="connectionStatus" style="margin-bottom: 1rem; padding: 10px; border-radius: 5px; font-size: 0.9rem;">
+                <div id="statusIndicator">🔄 Verbindung wird hergestellt...</div>
+            </div>
             <form id="loginForm">
                 <div class="form-group">
                     <label for="email">E-Mail:</label>
@@ -37,6 +61,10 @@
         <div class="header">
             <h1>Zeig, was du kannst!</h1>
             <div class="user-info">
+                <div id="connectionIndicator" style="margin-right: 1rem; font-size: 0.8rem;">
+                    <span id="connectionIcon">🔄</span>
+                    <span id="connectionText">Verbindung...</span>
+                </div>
                 <span id="currentUser"></span>
                 <button class="logout-btn" onclick="logout()">Abmelden</button>
             </div>
@@ -402,7 +430,8 @@
         </div>
     </div>
 
-    <!-- Firebase Integration wird geladen -->
+    <!-- Scripte in korrekter Reihenfolge -->
+    <script src="env-config.js"></script>
     <script src="fireconfig.js"></script>
     <script src="fireclient.js"></script>
     <script src="main.js"></script>
@@ -411,5 +440,93 @@
     <script src="themen.js"></script>
     <script src="bewertung.js"></script>
     <script src="pdf.js"></script>
+    
+    <!-- Zusätzliche Scripte für Status-Updates -->
+    <script>
+        // Status-Indikatoren verwalten
+        function updateConnectionStatus() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const connectionIcon = document.getElementById('connectionIcon');
+            const connectionText = document.getElementById('connectionText');
+            const connectionStatus = document.getElementById('connectionStatus');
+            
+            if (window.FirebaseClient) {
+                const status = window.FirebaseClient.status();
+                
+                if (status.firebaseInitialized && status.isOnline) {
+                    if (statusIndicator) {
+                        statusIndicator.textContent = '🔥 Firebase verbunden';
+                        connectionStatus.style.background = '#d4edda';
+                        connectionStatus.style.color = '#155724';
+                    }
+                    if (connectionIcon) connectionIcon.textContent = '🔥';
+                    if (connectionText) connectionText.textContent = 'Firebase';
+                } else if (status.firebaseInitialized && !status.isOnline) {
+                    if (statusIndicator) {
+                        statusIndicator.textContent = '📴 Offline-Modus';
+                        connectionStatus.style.background = '#fff3cd';
+                        connectionStatus.style.color = '#856404';
+                    }
+                    if (connectionIcon) connectionIcon.textContent = '📴';
+                    if (connectionText) connectionText.textContent = 'Offline';
+                } else {
+                    if (statusIndicator) {
+                        statusIndicator.textContent = '🏠 Lokaler Modus';
+                        connectionStatus.style.background = '#cce7ff';
+                        connectionStatus.style.color = '#004085';
+                    }
+                    if (connectionIcon) connectionIcon.textContent = '🏠';
+                    if (connectionText) connectionText.textContent = 'Lokal';
+                }
+            }
+        }
+        
+        // Status regelmäßig aktualisieren
+        setInterval(updateConnectionStatus, 5000);
+        
+        // Event-Listener für Firebase-Events
+        window.addEventListener('firebaseReady', () => {
+            console.log('🎉 Firebase-Event: Ready');
+            updateConnectionStatus();
+        });
+        
+        window.addEventListener('localModeReady', () => {
+            console.log('🎉 Local-Event: Ready');
+            updateConnectionStatus();
+        });
+        
+        // Loading-Indicator ausblenden nach dem Laden
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const loadingIndicator = document.getElementById('loadingIndicator');
+                if (loadingIndicator) {
+                    loadingIndicator.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingIndicator.style.display = 'none';
+                    }, 500);
+                }
+                
+                // Initial Status update
+                updateConnectionStatus();
+            }, 1000);
+        });
+        
+        // Fehler-Handler für unbehandelte Errors
+        window.addEventListener('error', (event) => {
+            console.error('🚨 Unbehandelter Fehler:', event.error);
+            
+            // Firebase-spezifische Fehler behandeln
+            if (event.error.message.includes('Firebase') || event.error.message.includes('firestore')) {
+                const statusIndicator = document.getElementById('statusIndicator');
+                if (statusIndicator && !window.firebaseInitialized) {
+                    statusIndicator.textContent = '⚠️ Firebase-Fehler - Lokaler Modus';
+                    document.getElementById('connectionStatus').style.background = '#f8d7da';
+                    document.getElementById('connectionStatus').style.color = '#721c24';
+                }
+            }
+        });
+        
+        console.log('🚀 App-Interface geladen und bereit');
+    </script>
 </body>
 </html>

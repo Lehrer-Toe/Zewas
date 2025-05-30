@@ -1,15 +1,26 @@
-// Firebase Konfiguration
+// Firebase Konfiguration - Korrigiert für Browser-Umgebung
 // WICHTIG: Diese Datei wird über Netlify-Umgebungsvariablen konfiguriert
+
+// Funktion zum Laden der Environment Variables (Netlify-spezifisch)
+function getNetlifyEnvVar(varName, fallback) {
+    // In Netlify werden Environment Variables zur Build-Zeit in window._env injiziert
+    if (typeof window !== 'undefined' && window._env && window._env[varName]) {
+        return window._env[varName];
+    }
+    
+    // Fallback für lokale Entwicklung oder wenn Variables nicht verfügbar
+    return fallback;
+}
 
 // Firebase-Konfiguration (wird über Netlify Environment Variables gesetzt)
 const firebaseConfig = {
-    apiKey: process.env.FIREBASE_API_KEY || "demo-api-key",
-    authDomain: process.env.FIREBASE_AUTH_DOMAIN || "zeig-was-du-kannst-demo.firebaseapp.com",
-    projectId: process.env.FIREBASE_PROJECT_ID || "zeig-was-du-kannst-demo",
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "zeig-was-du-kannst-demo.appspot.com",
-    messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "123456789",
-    appId: process.env.FIREBASE_APP_ID || "1:123456789:web:abcdefghijklmnop",
-    databaseURL: process.env.FIREBASE_DATABASE_URL || "https://zeig-was-du-kannst-demo-default-rtdb.europe-west1.firebasedatabase.app/"
+    apiKey: getNetlifyEnvVar('FIREBASE_API_KEY', "demo-api-key"),
+    authDomain: getNetlifyEnvVar('FIREBASE_AUTH_DOMAIN', "zeig-was-du-kannst-demo.firebaseapp.com"),
+    projectId: getNetlifyEnvVar('FIREBASE_PROJECT_ID', "zeig-was-du-kannst-demo"),
+    storageBucket: getNetlifyEnvVar('FIREBASE_STORAGE_BUCKET', "zeig-was-du-kannst-demo.appspot.com"),
+    messagingSenderId: getNetlifyEnvVar('FIREBASE_MESSAGING_SENDER_ID', "123456789"),
+    appId: getNetlifyEnvVar('FIREBASE_APP_ID', "1:123456789:web:abcdefghijklmnop"),
+    databaseURL: getNetlifyEnvVar('FIREBASE_DATABASE_URL', "https://zeig-was-du-kannst-demo-default-rtdb.europe-west1.firebasedatabase.app/")
 };
 
 // Firebase Services Konfiguration
@@ -77,6 +88,24 @@ const SYNC_CONFIG = {
     conflictResolution: 'server-wins' // oder 'client-wins', 'manual'
 };
 
+// Prüfe ob Firebase-Konfiguration verfügbar ist
+function validateFirebaseConfig() {
+    const requiredFields = ['apiKey', 'authDomain', 'projectId'];
+    const isValid = requiredFields.every(field => 
+        firebaseConfig[field] && firebaseConfig[field] !== `demo-${field.toLowerCase()}`
+    );
+    
+    if (!isValid) {
+        console.warn('⚠️ Firebase-Konfiguration unvollständig - verwende Demo-Modus');
+        DEVELOPMENT_MODE.useLocalData = true;
+        FIREBASE_SERVICES.auth = false;
+        FIREBASE_SERVICES.firestore = false;
+        FIREBASE_SERVICES.storage = false;
+    }
+    
+    return isValid;
+}
+
 // Export der Konfiguration für andere Module
 if (typeof module !== 'undefined' && module.exports) {
     // Node.js Environment (Netlify Functions)
@@ -87,7 +116,8 @@ if (typeof module !== 'undefined' && module.exports) {
         FIREBASE_COLLECTIONS,
         SECURITY_RULES,
         APP_CONFIG,
-        SYNC_CONFIG
+        SYNC_CONFIG,
+        validateFirebaseConfig
     };
 } else {
     // Browser Environment
@@ -98,6 +128,12 @@ if (typeof module !== 'undefined' && module.exports) {
     window.SECURITY_RULES = SECURITY_RULES;
     window.APP_CONFIG = APP_CONFIG;
     window.SYNC_CONFIG = SYNC_CONFIG;
+    
+    // Validierung beim Laden ausführen
+    const configValid = validateFirebaseConfig();
+    
+    // Global verfügbar machen
+    window.firebaseConfigValid = configValid;
 }
 
 // Logging für Debug-Zwecke
@@ -106,6 +142,31 @@ if (DEVELOPMENT_MODE.enabled && DEVELOPMENT_MODE.logLevel === 'debug') {
         projectId: firebaseConfig.projectId,
         services: FIREBASE_SERVICES,
         collections: Object.keys(FIREBASE_COLLECTIONS),
-        developmentMode: DEVELOPMENT_MODE.enabled
+        developmentMode: DEVELOPMENT_MODE.enabled,
+        configValid: typeof window !== 'undefined' ? window.firebaseConfigValid : 'unknown'
     });
+}
+
+// Hilfsfunktion für Environment Variables Setup in Netlify
+function setupNetlifyEnvVars() {
+    console.log(`
+🔧 Firebase Konfiguration:
+
+Zur korrekten Funktion müssen in Netlify folgende Environment Variables gesetzt werden:
+
+FIREBASE_API_KEY=your-api-key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=123456789
+FIREBASE_APP_ID=1:123456789:web:abcdefghijklmnop
+FIREBASE_DATABASE_URL=https://your-project-default-rtdb.europe-west1.firebasedatabase.app/
+
+Aktueller Status: ${window.firebaseConfigValid ? '✅ Konfiguriert' : '❌ Demo-Modus'}
+    `);
+}
+
+// Setup-Hilfe nur im Development Mode anzeigen
+if (typeof window !== 'undefined' && DEVELOPMENT_MODE.enabled && !window.firebaseConfigValid) {
+    setTimeout(setupNetlifyEnvVars, 1000);
 }

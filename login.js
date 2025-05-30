@@ -92,7 +92,7 @@ async function loginUser() {
             showApp();
             console.log('✅ Login erfolgreich:', currentUser.name);
             
-            // Initiale Daten laden
+            // WICHTIG: Initiale Daten erst NACH erfolgreichem Login laden
             await loadInitialData();
             
             // Admin-Setup prüfen
@@ -226,7 +226,7 @@ function updateConnectionStatusInHeader() {
     }
 }
 
-// Initiale Daten aus Firebase laden
+// Initiale Daten aus Firebase laden - NUR NACH LOGIN
 async function loadInitialData() {
     try {
         console.log('📊 Lade initiale Daten aus Firebase...');
@@ -259,6 +259,52 @@ async function loadInitialData() {
             }
         }
         
+        // Lade Fächer falls noch nicht geladen
+        if (Object.keys(alleFaecherGlobal).length === 0) {
+            const faecherResult = await window.FirebaseClient.load('faecher');
+            if (faecherResult.success && faecherResult.data.length > 0) {
+                const faecher = faecherResult.data.find(f => f.id === 'standard-faecher');
+                if (faecher) {
+                    window.alleFaecherGlobal = faecher;
+                    alleFaecherGlobal = faecher;
+                    console.log('📚 Fächer geladen');
+                }
+            }
+        }
+        
+        // Lade Checkpoints falls noch nicht geladen
+        if (Object.keys(bewertungsCheckpoints).length === 0) {
+            const checkpointsResult = await window.FirebaseClient.load('checkpoints');
+            if (checkpointsResult.success && checkpointsResult.data.length > 0) {
+                const checkpoints = checkpointsResult.data.find(c => c.id === 'bewertungs-checkpoints');
+                if (checkpoints) {
+                    window.bewertungsCheckpoints = checkpoints;
+                    bewertungsCheckpoints = checkpoints;
+                    console.log('✅ Bewertungs-Checkpoints geladen');
+                }
+            }
+        }
+        
+        // Lade Briefvorlagen falls noch nicht geladen
+        if (!briefvorlage.anrede || !briefvorlage.schluss) {
+            const briefvorlagenResult = await window.FirebaseClient.load('briefvorlagen');
+            if (briefvorlagenResult.success && briefvorlagenResult.data.length > 0) {
+                const vorlage = briefvorlagenResult.data.find(v => v.id === 'standard-vorlage');
+                if (vorlage) {
+                    window.briefvorlage = vorlage;
+                    briefvorlage = vorlage;
+                    console.log('📝 Briefvorlage geladen');
+                }
+                
+                const formulierungen = briefvorlagenResult.data.find(v => v.id === 'staerken-formulierungen');
+                if (formulierungen) {
+                    window.staerkenFormulierungen = formulierungen;
+                    staerkenFormulierungen = formulierungen;
+                    console.log('📝 Stärken-Formulierungen geladen');
+                }
+            }
+        }
+        
         // Lade alle anderen Daten
         const dataToLoad = {
             'users': 'users',
@@ -278,13 +324,23 @@ async function loadInitialData() {
                     eval(`${globalVar} = window.${globalVar}`);
                 }
                 console.log(`✅ ${collection} geladen (${result.data.length} Einträge)`);
+            } else {
+                console.warn(`⚠️ Fehler beim Laden von ${collection}:`, result.error);
             }
         }
         
         console.log('✅ Alle Daten geladen');
+        
+        // Initialisiere UI nach Datenladen
+        loadSchuelerLehrerAuswahl();
+        loadTabInhalte();
+        
+        // Event auslösen, dass Daten geladen sind
+        window.dispatchEvent(new CustomEvent('dataLoaded', { detail: { success: true } }));
+        
     } catch (error) {
         console.error('❌ Fehler beim Laden der Daten:', error);
-        showError('Fehler beim Laden der Daten. Bitte laden Sie die Seite neu.');
+        showError('Fehler beim Laden der Daten aus Firebase. Einige Funktionen sind möglicherweise nicht verfügbar.');
     }
 }
 
@@ -303,6 +359,8 @@ async function checkAdminSetup() {
             script.src = 'admin-setup.js';
             script.onload = () => {
                 if (typeof window.AdminSetup !== 'undefined') {
+                    console.log('🔧 Admin-Setup-Script geladen, starte Einrichtung...');
+                    window.dispatchEvent(new CustomEvent('adminLoginSuccess'));
                     window.AdminSetup.checkAndRun();
                 }
             };
@@ -354,54 +412,8 @@ async function logout() {
     }
 }
 
-// Auto-Login bei bestehender Firebase-Session
-window.addEventListener('load', function() {
-    // Warten bis Firebase initialisiert ist
-    setTimeout(checkExistingSession, 1500);
-});
-
-async function checkExistingSession() {
-    try {
-        if (window.firebase && window.firebase.auth && window.firebaseInitialized) {
-            console.log('🔍 Prüfe bestehende Firebase-Session...');
-            
-            window.firebase.auth().onAuthStateChanged(async (user) => {
-                if (user && !currentUser) {
-                    console.log('🔄 Bestehende Firebase-Session gefunden:', user.email);
-                    
-                    // Benutzerdaten aus Firestore laden
-                    try {
-                        const userDoc = await window.firebase.firestore()
-                            .collection('users')
-                            .doc(user.uid)
-                            .get();
-                        
-                        if (userDoc.exists) {
-                            const userData = userDoc.data();
-                            currentUser = {
-                                email: user.email,
-                                name: userData.name,
-                                role: userData.role,
-                                uid: user.uid
-                            };
-                            window.currentUser = currentUser;
-                            
-                            showApp();
-                            await loadInitialData();
-                            console.log('✅ Auto-Login erfolgreich:', currentUser.name);
-                        } else {
-                            console.warn('⚠️ Benutzerdaten nicht in Firestore gefunden');
-                        }
-                    } catch (error) {
-                        console.warn('⚠️ Auto-Login fehlgeschlagen:', error);
-                    }
-                }
-            });
-        }
-    } catch (error) {
-        console.log('⚠️ Auto-Login nicht verfügbar:', error.message);
-    }
-}
+// Auto-Login bei bestehender Firebase-Session - ENTFERNT
+// (Da dies das Problem mit fehlenden Permissions verursacht)
 
 // Keyboard-Support für Login
 document.addEventListener('keydown', function(e) {

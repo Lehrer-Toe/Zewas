@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zeig, was du kannst!</title>
+    <title>Zeig, was du kannst! - Online-Modus</title>
     <link rel="stylesheet" href="styles.css">
     
     <!-- Preload wichtige Scripte -->
@@ -24,7 +24,10 @@
         <div style="text-align: center;">
             <div style="font-size: 3rem; margin-bottom: 1rem;">🎺</div>
             <div>Zeig, was du kannst!</div>
-            <div style="font-size: 0.9rem; margin-top: 0.5rem;">Wird geladen...</div>
+            <div style="font-size: 0.9rem; margin-top: 0.5rem;">Verbindung zu Firebase wird hergestellt...</div>
+            <div style="width: 100%; max-width: 300px; height: 5px; background: rgba(255,255,255,0.3); margin-top: 20px; border-radius: 3px; overflow: hidden;">
+                <div id="progressBar" style="width: 0%; height: 100%; background: white; border-radius: 3px; transition: width 0.5s;"></div>
+            </div>
         </div>
     </div>
 
@@ -33,7 +36,7 @@
         <div class="login-card">
             <h1>Zeig, was du kannst!</h1>
             <div id="connectionStatus" style="margin-bottom: 1rem; padding: 10px; border-radius: 5px; font-size: 0.9rem;">
-                <div id="statusIndicator">🔄 Verbindung wird hergestellt...</div>
+                <div id="statusIndicator">🔄 Verbindung zu Firebase wird hergestellt...</div>
             </div>
             <form id="loginForm">
                 <div class="form-group">
@@ -44,7 +47,7 @@
                     <label for="password">Passwort:</label>
                     <input type="password" id="password" required>
                 </div>
-                <button type="submit" class="login-btn">Anmelden</button>
+                <button type="submit" class="login-btn" id="loginButton">Anmelden</button>
                 <div id="errorMessage" class="error-message"></div>
             </form>
             <div style="margin-top: 2rem; font-size: 0.9rem; color: #666;">
@@ -63,7 +66,7 @@
             <div class="user-info">
                 <div id="connectionIndicator" style="margin-right: 1rem; font-size: 0.8rem;">
                     <span id="connectionIcon">🔄</span>
-                    <span id="connectionText">Verbindung...</span>
+                    <span id="connectionText">Verbindung zu Firebase...</span>
                 </div>
                 <span id="currentUser"></span>
                 <button class="logout-btn" onclick="logout()">Abmelden</button>
@@ -104,7 +107,7 @@
                     </div>
                 </div>
                 <div id="newsList">
-                    <!-- News werden hier dynamisch eingefügt -->
+                    <div class="card"><p>Nachrichten werden geladen...</p></div>
                 </div>
             </div>
 
@@ -123,28 +126,12 @@
                         <label>Filter nach Fach:</label>
                         <select id="themenFachFilter" onchange="filterThemen()">
                             <option value="">Alle Fächer</option>
-                            <option value="D">Deutsch</option>
-                            <option value="M">Mathematik</option>
-                            <option value="E">Englisch</option>
-                            <option value="FR">Französisch</option>
-                            <option value="T">Technik</option>
-                            <option value="AES">AES</option>
-                            <option value="G">Geschichte</option>
-                            <option value="GK">Gemeinschaftskunde</option>
-                            <option value="BIO">Biologie</option>
-                            <option value="PH">Physik</option>
-                            <option value="SP">Sport</option>
-                            <option value="BK">Bildende Kunst</option>
-                            <option value="IT">Informatik</option>
-                            <option value="WBS">WBS</option>
-                            <option value="REL">Religion</option>
-                            <option value="ETH">Ethik</option>
-                            <option value="ALL">Allgemein</option>
+                            <!-- Fächer werden dynamisch geladen -->
                         </select>
                     </div>
                 </div>
                 <div class="liste" id="themenListe">
-                    <!-- Themen werden hier angezeigt -->
+                    <div class="card"><p>Themen werden geladen...</p></div>
                 </div>
             </div>
 
@@ -164,9 +151,11 @@
                                 <input type="text" placeholder="Schülername" class="schueler-name">
                                 <select class="schueler-lehrer">
                                     <option value="">Lehrer wählen...</option>
+                                    <!-- Lehrer werden dynamisch geladen -->
                                 </select>
                                 <select class="schueler-fach">
                                     <option value="">Fach wählen...</option>
+                                    <!-- Fächer werden dynamisch geladen -->
                                 </select>
                                 <button type="button" class="btn btn-danger" onclick="schuelerEntfernen(this)">Entfernen</button>
                             </div>
@@ -175,7 +164,7 @@
                     </div>
                 </div>
                 <div class="liste" id="gruppenListe">
-                    <!-- Gruppen werden hier angezeigt -->
+                    <div class="card"><p>Gruppen werden geladen...</p></div>
                 </div>
                 
                 <!-- Gruppen bearbeiten Modal -->
@@ -212,7 +201,7 @@
                     </div>
                 </div>
                 <div class="liste" id="lehrerListe">
-                    <!-- Lehrer werden hier angezeigt -->
+                    <div class="card"><p>Lehrer werden geladen...</p></div>
                 </div>
             </div>
 
@@ -223,7 +212,7 @@
                     <h3>Schuljahr</h3>
                     <div class="input-group">
                         <label>Aktuelles Schuljahr:</label>
-                        <input type="text" id="schuljahr" value="2025/26" placeholder="z.B. 2025/26">
+                        <input type="text" id="schuljahr" placeholder="z.B. 2025/26">
                         <button class="btn" onclick="schuljahrSpeichern()">Speichern</button>
                     </div>
                 </div>
@@ -247,7 +236,7 @@
                 <div class="card">
                     <h3>Statistiken</h3>
                     <div id="statistiken">
-                        <!-- Statistiken werden hier angezeigt -->
+                        <div class="card"><p>Statistiken werden geladen...</p></div>
                     </div>
                 </div>
             </div>
@@ -271,7 +260,7 @@
                     </div>
                 </div>
                 <div id="bewertungsListe">
-                    <!-- Zu bewertende Schüler -->
+                    <div class="card"><p>Bewertungsliste wird geladen...</p></div>
                 </div>
                 <div id="bewertungsRaster" class="bewertung-container hidden">
                     <!-- Bewertungsbereich mit Tabs -->
@@ -337,7 +326,7 @@
                     </div>
                 </div>
                 <div class="liste" id="vorlagenListe">
-                    <!-- Vorlagen werden hier angezeigt -->
+                    <div class="card"><p>Vorlagen werden geladen...</p></div>
                 </div>
             </div>
 
@@ -348,14 +337,16 @@
                 <!-- Fächer verwalten -->
                 <div class="card">
                     <div id="faecherVerwaltung">
-                        <!-- Fächer-Verwaltung wird hier angezeigt -->
+                        <h3>Fächer verwalten</h3>
+                        <div class="card"><p>Fächer werden geladen...</p></div>
                     </div>
                 </div>
                 
                 <!-- Bewertungs-Checkpoints verwalten -->
                 <div class="card">
                     <div id="checkpointsVerwaltung">
-                        <!-- Checkpoints-Verwaltung wird hier angezeigt -->
+                        <h3>Bewertungs-Checkpoints verwalten</h3>
+                        <div class="card"><p>Checkpoints werden geladen...</p></div>
                     </div>
                 </div>
                 
@@ -364,7 +355,7 @@
                     <h3>Standardformulierungen für Stärken</h3>
                     <p><em>Verwenden Sie [NAME] als Platzhalter für den Schülernamen. Ohne [NAME] wird nur der Text verwendet.</em></p>
                     <div id="staerkenFormulierungen">
-                        <!-- Formulierungen werden hier angezeigt -->
+                        <div class="card"><p>Formulierungen werden geladen...</p></div>
                     </div>
                     <button class="btn btn-success" onclick="staerkenFormulierungenSpeichern()">Speichern</button>
                 </div>
@@ -413,7 +404,7 @@
                 <div class="card">
                     <h3>Statistiken</h3>
                     <div id="lehrerStatistiken">
-                        <!-- Statistiken werden hier angezeigt -->
+                        <div class="card"><p>Statistiken werden geladen...</p></div>
                     </div>
                 </div>
                 <div class="card">
@@ -424,8 +415,19 @@
                     </div>
                 </div>
                 <div class="liste" id="meineSchuelerListe">
-                    <!-- Schüler werden hier angezeigt -->
+                    <div class="card"><p>Schüler werden geladen...</p></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase-Fehler-Dialog -->
+    <div id="firebaseErrorDialog" class="modal hidden">
+        <div class="modal-content">
+            <h3>⚠️ Verbindungsfehler</h3>
+            <p id="firebaseErrorMessage">Es konnte keine Verbindung zu Firebase hergestellt werden.</p>
+            <div class="modal-buttons">
+                <button class="btn btn-danger" onclick="location.reload()">Seite neu laden</button>
             </div>
         </div>
     </div>
@@ -449,6 +451,12 @@
             const connectionIcon = document.getElementById('connectionIcon');
             const connectionText = document.getElementById('connectionText');
             const connectionStatus = document.getElementById('connectionStatus');
+            const progressBar = document.getElementById('progressBar');
+            
+            if (progressBar) {
+                // Zeige 100% an wenn Firebase bereit ist, ansonsten graduellen Fortschritt
+                progressBar.style.width = window.firebaseInitialized ? '100%' : '70%';
+            }
             
             if (window.FirebaseClient) {
                 const status = window.FirebaseClient.status();
@@ -463,21 +471,38 @@
                     if (connectionText) connectionText.textContent = 'Firebase';
                 } else if (status.firebaseInitialized && !status.isOnline) {
                     if (statusIndicator) {
-                        statusIndicator.textContent = '📴 Offline-Modus';
-                        connectionStatus.style.background = '#fff3cd';
-                        connectionStatus.style.color = '#856404';
+                        statusIndicator.textContent = '📴 Offline-Modus wird nicht unterstützt';
+                        connectionStatus.style.background = '#f8d7da';
+                        connectionStatus.style.color = '#721c24';
                     }
                     if (connectionIcon) connectionIcon.textContent = '📴';
                     if (connectionText) connectionText.textContent = 'Offline';
+                    
+                    // Firebase-Fehler-Dialog anzeigen
+                    showFirebaseErrorDialog('Keine Internetverbindung. Die App benötigt eine aktive Internetverbindung.');
                 } else {
                     if (statusIndicator) {
-                        statusIndicator.textContent = '🏠 Lokaler Modus';
-                        connectionStatus.style.background = '#cce7ff';
-                        connectionStatus.style.color = '#004085';
+                        statusIndicator.textContent = '⚠️ Verbindung zu Firebase nicht möglich';
+                        connectionStatus.style.background = '#f8d7da';
+                        connectionStatus.style.color = '#721c24';
                     }
-                    if (connectionIcon) connectionIcon.textContent = '🏠';
-                    if (connectionText) connectionText.textContent = 'Lokal';
+                    if (connectionIcon) connectionIcon.textContent = '⚠️';
+                    if (connectionText) connectionText.textContent = 'Fehler';
+                    
+                    // Firebase-Fehler-Dialog anzeigen
+                    showFirebaseErrorDialog('Firebase konnte nicht initialisiert werden. Bitte prüfen Sie Ihre Internetverbindung und laden Sie die Seite neu.');
                 }
+            }
+        }
+        
+        // Firebase-Fehler-Dialog anzeigen
+        function showFirebaseErrorDialog(message) {
+            const dialog = document.getElementById('firebaseErrorDialog');
+            const messageElement = document.getElementById('firebaseErrorMessage');
+            
+            if (dialog && messageElement) {
+                messageElement.textContent = message;
+                dialog.classList.remove('hidden');
             }
         }
         
@@ -487,11 +512,6 @@
         // Event-Listener für Firebase-Events
         window.addEventListener('firebaseReady', () => {
             console.log('🎉 Firebase-Event: Ready');
-            updateConnectionStatus();
-        });
-        
-        window.addEventListener('localModeReady', () => {
-            console.log('🎉 Local-Event: Ready');
             updateConnectionStatus();
         });
         
@@ -511,6 +531,12 @@
             }, 1000);
         });
         
+        // Data-Loaded Event
+        window.addEventListener('dataLoaded', (event) => {
+            console.log('🎉 Daten geladen:', event.detail);
+            // Hier könnten weitere Aktionen ausgeführt werden, wenn die Daten geladen sind
+        });
+        
         // Fehler-Handler für unbehandelte Errors
         window.addEventListener('error', (event) => {
             console.error('🚨 Unbehandelter Fehler:', event.error);
@@ -519,12 +545,35 @@
             if (event.error.message.includes('Firebase') || event.error.message.includes('firestore')) {
                 const statusIndicator = document.getElementById('statusIndicator');
                 if (statusIndicator && !window.firebaseInitialized) {
-                    statusIndicator.textContent = '⚠️ Firebase-Fehler - Lokaler Modus';
+                    statusIndicator.textContent = '⚠️ Firebase-Fehler - Bitte Seite neu laden';
                     document.getElementById('connectionStatus').style.background = '#f8d7da';
                     document.getElementById('connectionStatus').style.color = '#721c24';
                 }
+                
+                // Firebase-Fehler-Dialog anzeigen nach kurzer Verzögerung
+                setTimeout(() => {
+                    showFirebaseErrorDialog('Es ist ein Fehler bei der Verbindung zu Firebase aufgetreten. Bitte laden Sie die Seite neu.');
+                }, 2000);
             }
         });
+        
+        // Login-Button deaktivieren, wenn Firebase noch nicht bereit ist
+        function updateLoginButtonStatus() {
+            const loginButton = document.getElementById('loginButton');
+            
+            if (loginButton) {
+                if (!window.firebaseInitialized) {
+                    loginButton.disabled = true;
+                    loginButton.textContent = 'Warte auf Firebase...';
+                } else {
+                    loginButton.disabled = false;
+                    loginButton.textContent = 'Anmelden';
+                }
+            }
+        }
+        
+        // Regelmäßig prüfen
+        setInterval(updateLoginButtonStatus, 1000);
         
         console.log('🚀 App-Interface geladen und bereit');
     </script>

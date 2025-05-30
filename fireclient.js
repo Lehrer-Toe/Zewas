@@ -1,4 +1,4 @@
-// Firebase Client - Integration für "Zeig, was du kannst!"
+// Firebase Client - Integration für "Zeig, was du kannst!" - KORRIGIERT
 // Diese Datei bereitet die Firebase-Integration vor und bietet Fallback-Funktionalität
 
 // Firebase SDK wird über CDN geladen (in Produktion)
@@ -15,18 +15,18 @@ let syncQueue = [];
 // Initialisierung
 async function initializeFirebase() {
     try {
-        if (typeof window !== 'undefined' && window.FIREBASE_CONFIG) {
+        if (typeof window !== 'undefined' && window.FIREBASE_CONFIG && window.firebaseConfigValid) {
             console.log('🔥 Initialisiere Firebase...');
             
-            // Firebase SDK laden (über CDN)
+            // Firebase SDK laden (über CDN - neue Version)
             if (typeof firebase === 'undefined') {
                 console.log('📦 Firebase SDK wird über CDN geladen...');
                 await loadFirebaseSDK();
             }
             
             // Firebase App initialisieren
-            if (!firebase.apps.length) {
-                firebase.initializeApp(window.FIREBASE_CONFIG);
+            if (!firebase.apps || firebase.apps.length === 0) {
+                const app = firebase.initializeApp(window.FIREBASE_CONFIG);
                 console.log('✅ Firebase App initialisiert');
             }
             
@@ -34,6 +34,15 @@ async function initializeFirebase() {
             if (window.FIREBASE_SERVICES.auth) {
                 auth = firebase.auth();
                 console.log('🔐 Firebase Auth initialisiert');
+                
+                // Auth State Listener
+                auth.onAuthStateChanged((user) => {
+                    if (user) {
+                        console.log('👤 Benutzer angemeldet:', user.email);
+                    } else {
+                        console.log('👤 Benutzer abgemeldet');
+                    }
+                });
             }
             
             if (window.FIREBASE_SERVICES.firestore) {
@@ -41,9 +50,18 @@ async function initializeFirebase() {
                 
                 // Offline-Unterstützung aktivieren
                 if (window.DEVELOPMENT_MODE.offlineSupport) {
-                    await db.enablePersistence().catch(err => {
-                        console.warn('⚠️ Offline-Persistence nicht verfügbar:', err);
-                    });
+                    try {
+                        await db.enablePersistence({ synchronizeTabs: true });
+                        console.log('💾 Offline-Persistence aktiviert');
+                    } catch (err) {
+                        if (err.code === 'failed-precondition') {
+                            console.warn('⚠️ Persistence failed: Mehrere Tabs geöffnet');
+                        } else if (err.code === 'unimplemented') {
+                            console.warn('⚠️ Persistence nicht verfügbar in diesem Browser');
+                        } else {
+                            console.warn('⚠️ Offline-Persistence nicht verfügbar:', err);
+                        }
+                    }
                 }
                 console.log('📊 Firestore initialisiert');
             }
@@ -54,6 +72,7 @@ async function initializeFirebase() {
             }
             
             firebaseInitialized = true;
+            window.firebaseInitialized = true;
             
             // Online/Offline Status überwachen
             setupNetworkMonitoring();
@@ -65,8 +84,13 @@ async function initializeFirebase() {
             
             console.log('🚀 Firebase vollständig initialisiert');
             
+            // Custom Event für andere Module
+            window.dispatchEvent(new CustomEvent('firebaseReady', { 
+                detail: { initialized: true } 
+            }));
+            
         } else {
-            console.log('⚡ Entwicklungsmodus: Verwende lokale Daten');
+            console.log('⚡ Lokalmodus: Verwende lokale Daten (Firebase-Config nicht verfügbar)');
             setupLocalFallback();
         }
     } catch (error) {
@@ -75,36 +99,55 @@ async function initializeFirebase() {
     }
 }
 
-// Firebase SDK dynamisch laden
+// Firebase SDK dynamisch laden - KORRIGIERTE VERSION
 async function loadFirebaseSDK() {
     return new Promise((resolve, reject) => {
-        // Firebase App
-        const appScript = document.createElement('script');
-        appScript.src = 'https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js';
-        appScript.onload = () => {
-            // Firebase Auth
-            const authScript = document.createElement('script');
-            authScript.src = 'https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js';
-            authScript.onload = () => {
-                // Firebase Firestore
-                const firestoreScript = document.createElement('script');
-                firestoreScript.src = 'https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js';
-                firestoreScript.onload = () => {
-                    // Firebase Storage
-                    const storageScript = document.createElement('script');
-                    storageScript.src = 'https://www.gstatic.com/firebasejs/9.0.0/firebase-storage.js';
-                    storageScript.onload = resolve;
-                    storageScript.onerror = reject;
-                    document.head.appendChild(storageScript);
-                };
-                firestoreScript.onerror = reject;
-                document.head.appendChild(firestoreScript);
+        // Prüfe ob Firebase bereits verfügbar ist
+        if (typeof firebase !== 'undefined') {
+            resolve();
+            return;
+        }
+        
+        // Firebase v9 Modular SDK über unpkg.com (CORS-freundlich)
+        const scripts = [
+            'https://unpkg.com/firebase@9.22.2/compat/firebase-compat-app.js',
+            'https://unpkg.com/firebase@9.22.2/compat/firebase-compat-auth.js',
+            'https://unpkg.com/firebase@9.22.2/compat/firebase-compat-firestore.js',
+            'https://unpkg.com/firebase@9.22.2/compat/firebase-compat-storage.js'
+        ];
+        
+        let loadedCount = 0;
+        const totalScripts = scripts.length;
+        
+        scripts.forEach((src, index) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = false; // Wichtig für richtige Ladereihenfolge
+            
+            script.onload = () => {
+                loadedCount++;
+                console.log(`📦 Firebase Modul ${index + 1}/${totalScripts} geladen`);
+                
+                if (loadedCount === totalScripts) {
+                    // Warte kurz bis alle Module verfügbar sind
+                    setTimeout(() => {
+                        if (typeof firebase !== 'undefined') {
+                            console.log('✅ Firebase SDK vollständig geladen');
+                            resolve();
+                        } else {
+                            reject(new Error('Firebase SDK nicht verfügbar nach dem Laden'));
+                        }
+                    }, 100);
+                }
             };
-            authScript.onerror = reject;
-            document.head.appendChild(authScript);
-        };
-        appScript.onerror = reject;
-        document.head.appendChild(appScript);
+            
+            script.onerror = (error) => {
+                console.error(`❌ Fehler beim Laden von ${src}:`, error);
+                reject(error);
+            };
+            
+            document.head.appendChild(script);
+        });
     });
 }
 
@@ -112,12 +155,18 @@ async function loadFirebaseSDK() {
 function setupLocalFallback() {
     console.log('🔧 Lokaler Fallback aktiviert');
     firebaseInitialized = false;
+    window.firebaseInitialized = false;
     
     // Lokale Daten laden falls vorhanden
     loadLocalData();
     
     // Periodisches Speichern
     setInterval(saveLocalData, window.SYNC_CONFIG?.interval || 60000);
+    
+    // Event für lokalen Modus
+    window.dispatchEvent(new CustomEvent('localModeReady', { 
+        detail: { localMode: true } 
+    }));
 }
 
 // Netzwerk-Monitoring
@@ -132,6 +181,10 @@ function setupNetworkMonitoring() {
         isOnline = false;
         console.log('📴 Offline-Modus');
     });
+    
+    // Initial Status prüfen
+    isOnline = navigator.onLine;
+    console.log(`🌐 Netzwerk-Status: ${isOnline ? 'Online' : 'Offline'}`);
 }
 
 // Auto-Sync
@@ -141,6 +194,8 @@ function startAutoSync() {
             syncAllData();
         }
     }, window.SYNC_CONFIG.interval);
+    
+    console.log(`🔄 Auto-Sync aktiviert (${window.SYNC_CONFIG.interval/1000}s Intervall)`);
 }
 
 // === DATEN-OPERATIONEN ===
@@ -149,6 +204,7 @@ function startAutoSync() {
 async function loginUser(email, password) {
     try {
         if (firebaseInitialized && auth) {
+            console.log('🔐 Firebase-Login für:', email);
             const userCredential = await auth.signInWithEmailAndPassword(email, password);
             const user = userCredential.user;
             
@@ -174,17 +230,50 @@ async function loginUser(email, password) {
             return loginUserLocal(email, password);
         }
     } catch (error) {
-        console.error('Login fehlgeschlagen:', error);
+        console.error('❌ Login fehlgeschlagen:', error);
+        
+        // Bei Firebase-Fehlern auch lokalen Login versuchen
+        if (error.code === 'auth/network-request-failed' || 
+            error.code === 'auth/too-many-requests') {
+            console.log('🔄 Versuche lokalen Login als Fallback...');
+            return loginUserLocal(email, password);
+        }
+        
         return {
             success: false,
-            error: error.message
+            error: translateFirebaseError(error)
         };
     }
 }
 
+// Firebase-Fehler übersetzen
+function translateFirebaseError(error) {
+    const translations = {
+        'auth/user-not-found': 'Benutzer nicht gefunden',
+        'auth/wrong-password': 'Falsches Passwort',
+        'auth/invalid-email': 'Ungültige E-Mail-Adresse',
+        'auth/user-disabled': 'Benutzerkonto deaktiviert',
+        'auth/too-many-requests': 'Zu viele Anmeldeversuche. Bitte später erneut versuchen.',
+        'auth/network-request-failed': 'Netzwerkfehler. Prüfen Sie Ihre Internetverbindung.'
+    };
+    
+    return translations[error.code] || error.message || 'Unbekannter Fehler';
+}
+
 // Lokale Authentifizierung (Fallback)
 function loginUserLocal(email, password) {
-    const user = users.find(u => u.email === email && u.password === password);
+    console.log('🏠 Lokaler Login für:', email);
+    
+    // users Array aus main.js verwenden
+    if (typeof window.users === 'undefined') {
+        console.error('❌ Lokale Benutzerdaten nicht verfügbar');
+        return {
+            success: false,
+            error: 'Lokale Daten nicht verfügbar'
+        };
+    }
+    
+    const user = window.users.find(u => u.email === email && u.password === password);
     if (user) {
         return {
             success: true,
@@ -202,16 +291,17 @@ function loginUserLocal(email, password) {
 async function saveData(collection, data, docId = null) {
     try {
         if (firebaseInitialized && db && isOnline) {
-            const collectionRef = db.collection(window.FIREBASE_COLLECTIONS[collection]);
+            const collectionRef = db.collection(window.FIREBASE_COLLECTIONS[collection] || collection);
             
             if (docId) {
                 await collectionRef.doc(docId).set(data, { merge: true });
             } else {
-                await collectionRef.add(data);
+                const docRef = await collectionRef.add(data);
+                docId = docRef.id;
             }
             
-            console.log(`✅ Daten gespeichert in ${collection}`);
-            return { success: true };
+            console.log(`✅ Daten gespeichert in ${collection}${docId ? ` (${docId})` : ''}`);
+            return { success: true, id: docId };
         } else {
             // Zur Sync-Queue hinzufügen
             addToSyncQueue('save', collection, data, docId);
@@ -228,7 +318,7 @@ async function saveData(collection, data, docId = null) {
 async function loadData(collection, filter = null) {
     try {
         if (firebaseInitialized && db && isOnline) {
-            let query = db.collection(window.FIREBASE_COLLECTIONS[collection]);
+            let query = db.collection(window.FIREBASE_COLLECTIONS[collection] || collection);
             
             // Filter anwenden falls vorhanden
             if (filter) {
@@ -263,23 +353,28 @@ async function loadData(collection, filter = null) {
 function loadDataLocal(collection, filter) {
     let data = [];
     
+    // Verwende globale Variablen aus main.js
     switch (collection) {
         case 'users':
-            data = users;
+            data = window.users || [];
             break;
         case 'themen':
-            data = themen;
+            data = window.themen || [];
             break;
         case 'gruppen':
-            data = gruppen;
+            data = window.gruppen || [];
             break;
         case 'bewertungen':
-            data = bewertungen;
+            data = window.bewertungen || [];
             break;
         case 'news':
-            data = news;
+            data = window.news || [];
+            break;
+        case 'vorlagen':
+            data = Object.values(window.vorlagen || {}).flat();
             break;
         default:
+            console.warn(`Unbekannte Collection: ${collection}`);
             data = [];
     }
     
@@ -290,6 +385,7 @@ function loadDataLocal(collection, filter) {
         });
     }
     
+    console.log(`📁 ${data.length} lokale Einträge aus ${collection} geladen`);
     return { success: true, data };
 }
 
@@ -303,7 +399,7 @@ function addToSyncQueue(operation, collection, data, docId = null) {
         timestamp: Date.now()
     });
     
-    console.log(`📝 Operation zur Sync-Queue hinzugefügt: ${operation} in ${collection}`);
+    console.log(`📝 Operation zur Sync-Queue hinzugefügt: ${operation} in ${collection} (Queue: ${syncQueue.length})`);
 }
 
 async function processSyncQueue() {
@@ -320,12 +416,19 @@ async function processSyncQueue() {
         try {
             if (operation.operation === 'save') {
                 await saveData(operation.collection, operation.data, operation.docId);
+                console.log(`✅ Sync erfolgreich: ${operation.collection}`);
             }
         } catch (error) {
             console.error('❌ Sync-Operation fehlgeschlagen:', error);
             // Zurück in die Queue falls Fehler
             syncQueue.push(operation);
         }
+    }
+    
+    if (syncQueue.length > 0) {
+        console.log(`⚠️ ${syncQueue.length} Operationen konnten nicht synchronisiert werden`);
+    } else {
+        console.log('✅ Alle Sync-Operationen erfolgreich');
     }
 }
 
@@ -338,24 +441,24 @@ async function syncAllData() {
     try {
         console.log('🔄 Vollständige Datensynchronisation...');
         
-        // Lokale Daten mit Firebase synchronisieren
-        await saveData('users', users);
-        await saveData('themen', themen);
-        await saveData('gruppen', gruppen);
-        await saveData('bewertungen', bewertungen);
-        await saveData('news', news);
+        // Zuerst Sync-Queue abarbeiten
+        await processSyncQueue();
         
-        // Auch App-Einstellungen synchronisieren
-        const settings = {
-            schuljahr,
-            alleFaecherGlobal,
-            bewertungsCheckpoints,
-            briefvorlage,
-            staerkenFormulierungen
-        };
-        await saveData('settings', settings, 'app-settings');
+        // App-Einstellungen synchronisieren
+        if (window.currentUser && window.currentUser.role === 'admin') {
+            const settings = {
+                schuljahr: window.schuljahr,
+                alleFaecherGlobal: window.alleFaecherGlobal,
+                bewertungsCheckpoints: window.bewertungsCheckpoints,
+                briefvorlage: window.briefvorlage,
+                staerkenFormulierungen: window.staerkenFormulierungen,
+                lastSync: new Date().toISOString()
+            };
+            await saveData('settings', settings, 'app-settings');
+        }
         
         console.log('✅ Datensynchronisation abgeschlossen');
+        localStorage.setItem('last-sync-time', new Date().toISOString());
     } catch (error) {
         console.error('❌ Sync-Fehler:', error);
     }
@@ -365,17 +468,17 @@ async function syncAllData() {
 function saveLocalData() {
     try {
         const localData = {
-            users,
-            themen,
-            gruppen,
-            bewertungen,
-            news,
-            vorlagen,
-            schuljahr,
-            alleFaecherGlobal,
-            bewertungsCheckpoints,
-            briefvorlage,
-            staerkenFormulierungen,
+            users: window.users || [],
+            themen: window.themen || [],
+            gruppen: window.gruppen || [],
+            bewertungen: window.bewertungen || [],
+            news: window.news || [],
+            vorlagen: window.vorlagen || {},
+            schuljahr: window.schuljahr || '2025/26',
+            alleFaecherGlobal: window.alleFaecherGlobal || {},
+            bewertungsCheckpoints: window.bewertungsCheckpoints || {},
+            briefvorlage: window.briefvorlage || {},
+            staerkenFormulierungen: window.staerkenFormulierungen || {},
             lastSaved: Date.now()
         };
         
@@ -396,20 +499,22 @@ function loadLocalData() {
             // Daten nur laden wenn sie nicht zu alt sind (24h)
             const maxAge = 24 * 60 * 60 * 1000;
             if (Date.now() - data.lastSaved < maxAge) {
-                // Globale Variablen aktualisieren
-                if (data.users) users = data.users;
-                if (data.themen) themen = data.themen;
-                if (data.gruppen) gruppen = data.gruppen;
-                if (data.bewertungen) bewertungen = data.bewertungen;
-                if (data.news) news = data.news;
-                if (data.vorlagen) vorlagen = data.vorlagen;
-                if (data.schuljahr) schuljahr = data.schuljahr;
-                if (data.alleFaecherGlobal) alleFaecherGlobal = data.alleFaecherGlobal;
-                if (data.bewertungsCheckpoints) bewertungsCheckpoints = data.bewertungsCheckpoints;
-                if (data.briefvorlage) briefvorlage = data.briefvorlage;
-                if (data.staerkenFormulierungen) staerkenFormulierungen = data.staerkenFormulierungen;
+                // Globale Variablen aktualisieren falls noch nicht definiert
+                if (!window.users && data.users) window.users = data.users;
+                if (!window.themen && data.themen) window.themen = data.themen;
+                if (!window.gruppen && data.gruppen) window.gruppen = data.gruppen;
+                if (!window.bewertungen && data.bewertungen) window.bewertungen = data.bewertungen;
+                if (!window.news && data.news) window.news = data.news;
+                if (!window.vorlagen && data.vorlagen) window.vorlagen = data.vorlagen;
+                if (!window.schuljahr && data.schuljahr) window.schuljahr = data.schuljahr;
+                if (!window.alleFaecherGlobal && data.alleFaecherGlobal) window.alleFaecherGlobal = data.alleFaecherGlobal;
+                if (!window.bewertungsCheckpoints && data.bewertungsCheckpoints) window.bewertungsCheckpoints = data.bewertungsCheckpoints;
+                if (!window.briefvorlage && data.briefvorlage) window.briefvorlage = data.briefvorlage;
+                if (!window.staerkenFormulierungen && data.staerkenFormulierungen) window.staerkenFormulierungen = data.staerkenFormulierungen;
                 
                 console.log('📁 Lokale Daten geladen (Stand:', new Date(data.lastSaved).toLocaleString(), ')');
+            } else {
+                console.log('📁 Lokale Daten zu alt, verwende Standard-Daten');
             }
         }
     } catch (error) {
@@ -444,7 +549,8 @@ function getConnectionStatus() {
         firebaseInitialized,
         isOnline,
         syncQueueLength: syncQueue.length,
-        lastSync: localStorage.getItem('last-sync-time')
+        lastSync: localStorage.getItem('last-sync-time'),
+        configValid: window.firebaseConfigValid || false
     };
 }
 
@@ -472,8 +578,15 @@ if (document.readyState === 'loading') {
 window.addEventListener('beforeunload', () => {
     saveLocalData();
     if (syncQueue.length > 0) {
-        console.log('⚠️ Offene Sync-Operationen beim Seitenwechsel');
+        console.log(`⚠️ ${syncQueue.length} offene Sync-Operationen beim Seitenwechsel`);
     }
 });
+
+// Periodisches lokales Speichern
+setInterval(() => {
+    if (!firebaseInitialized || !isOnline) {
+        saveLocalData();
+    }
+}, 300000); // Alle 5 Minuten
 
 console.log('🔧 Firebase Client geladen und bereit');

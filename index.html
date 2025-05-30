@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zeig, was du kannst!</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-card">
+            <h1>Zeig, was du kannst!</h1>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">E-Mail:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Passwort:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit" class="login-btn">Anmelden</button>
+                <div id="errorMessage" class="error-message"></div>
+            </form>
+            <div style="margin-top: 2rem; font-size: 0.9rem; color: #666;">
+                <strong>Demo-Accounts:</strong><br>
+                Admin: admin@schule.de / admin123<br>
+                Lehrer: riffel@schule.de / lehrer123<br>
+                Weitere: kretz@schule.de, toellner@schule.de, schwarz@schule.de, heiler@schule.de (alle: lehrer123)
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="appContainer" class="app-container">
+        <div class="header">
+            <h1>Zeig, was du kannst!</h1>
+            <div class="user-info">
+                <span id="currentUser"></span>
+                <button class="logout-btn" onclick="logout()">Abmelden</button>
+            </div>
+        </div>
+
+        <div class="tab-container">
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="openTab('news')" id="newsTab">News</button>
+                <button class="tab-btn" onclick="openTab('themen')" id="themenTab">Themen</button>
+                <button class="tab-btn" onclick="openTab('gruppen')" id="gruppenTab">Gruppen erstellen</button>
+                <button class="tab-btn" onclick="openTab('lehrer')" id="lehrerTab">Lehrer verwalten</button>
+                <button class="tab-btn" onclick="openTab('daten')" id="datenTab">Datenverwaltung</button>
+                <button class="tab-btn" onclick="openTab('bewerten')" id="bewertenTab">Schüler bewerten</button>
+                <button class="tab-btn" onclick="openTab('vorlagen')" id="vorlagenTab">Bewertungsvorlagen</button>
+                <button class="tab-btn" onclick="openTab('uebersicht')" id="uebersichtTab">Übersicht</button>
+                <button class="tab-btn" onclick="openTab('adminvorlagen')" id="adminvorlagenTab">Vorlagen</button>
+            </div>
+
+            <!-- News Tab -->
+            <div id="news" class="tab-content active">
+                <h2>Aktuelle News</h2>
+                <div id="adminNewsEditor" class="card" style="display: none;">
+                    <h3>Neue Nachricht erstellen</h3>
+                    <div class="input-group">
+                        <input type="text" id="newsTitel" placeholder="Titel der Nachricht">
+                        <textarea id="newsText" placeholder="Nachrichtentext" rows="3" style="flex: 2; resize: vertical;"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="newsWichtig"> Als wichtig markieren
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="newsZeitbegrenzt"> Zeitbegrenzt
+                        </label>
+                        <input type="date" id="newsAblauf" style="display: none;">
+                        <button class="btn" onclick="adminNewsErstellen()">Nachricht veröffentlichen</button>
+                    </div>
+                </div>
+                <div id="newsList">
+                    <!-- News werden hier dynamisch eingefügt -->
+                </div>
+            </div>
+
+            <!-- Themen Tab -->
+            <div id="themen" class="tab-content">
+                <h2>Themenvorschläge</h2>
+                <div class="card">
+                    <h3>Neues Thema vorschlagen</h3>
+                    <div class="input-group">
+                        <input type="text" id="neuesThema" placeholder="Thema eingeben...">
+                        <button class="btn btn-success" onclick="themaHinzufuegen()">Fächer auswählen & Thema erstellen</button>
+                    </div>
+                </div>
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>Filter nach Fach:</label>
+                        <select id="themenFachFilter" onchange="filterThemen()">
+                            <option value="">Alle Fächer</option>
+                            <option value="D">Deutsch</option>
+                            <option value="M">Mathematik</option>
+                            <option value="E">Englisch</option>
+                            <option value="FR">Französisch</option>
+                            <option value="T">Technik</option>
+                            <option value="AES">AES</option>
+                            <option value="G">Geschichte</option>
+                            <option value="GK">Gemeinschaftskunde</option>
+                            <option value="BIO">Biologie</option>
+                            <option value="PH">Physik</option>
+                            <option value="SP">Sport</option>
+                            <option value="BK">Bildende Kunst</option>
+                            <option value="IT">Informatik</option>
+                            <option value="WBS">WBS</option>
+                            <option value="REL">Religion</option>
+                            <option value="ETH">Ethik</option>
+                            <option value="ALL">Allgemein</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="liste" id="themenListe">
+                    <!-- Themen werden hier angezeigt -->
+                </div>
+            </div>
+
+            <!-- Gruppen Tab -->
+            <div id="gruppen" class="tab-content">
+                <h2>Gruppen erstellen</h2>
+                <div class="card">
+                    <h3>Neue Gruppe anlegen</h3>
+                    <div class="input-group">
+                        <input type="text" id="gruppenThema" placeholder="Thema (oder aus Liste wählen)">
+                        <button class="btn" onclick="gruppeErstellen()">Gruppe erstellen</button>
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <h4>Schüler hinzufügen:</h4>
+                        <div id="schuelerListe">
+                            <div class="input-group schueler-row">
+                                <input type="text" placeholder="Schülername" class="schueler-name">
+                                <select class="schueler-lehrer">
+                                    <option value="">Lehrer wählen...</option>
+                                </select>
+                                <select class="schueler-fach">
+                                    <option value="">Fach wählen...</option>
+                                </select>
+                                <button type="button" class="btn btn-danger" onclick="schuelerEntfernen(this)">Entfernen</button>
+                            </div>
+                        </div>
+                        <button class="btn" onclick="schuelerHinzufuegen()">Weiteren Schüler hinzufügen</button>
+                    </div>
+                </div>
+                <div class="liste" id="gruppenListe">
+                    <!-- Gruppen werden hier angezeigt -->
+                </div>
+                
+                <!-- Gruppen bearbeiten Modal -->
+                <div id="gruppenEditModal" class="modal hidden">
+                    <div class="modal-content">
+                        <h3>Gruppe bearbeiten</h3>
+                        <div class="input-group">
+                            <label>Thema:</label>
+                            <input type="text" id="editGruppenThema">
+                        </div>
+                        <h4>Schüler:</h4>
+                        <div id="editSchuelerListe">
+                            <!-- Schüler werden hier angezeigt -->
+                        </div>
+                        <button class="btn" onclick="neuerSchuelerInEdit()">Schüler hinzufügen</button>
+                        <div class="modal-buttons">
+                            <button class="btn btn-success" onclick="gruppeEditSpeichern()">Speichern</button>
+                            <button class="btn btn-danger" onclick="gruppeEditAbbrechen()">Abbrechen</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lehrer verwalten Tab -->
+            <div id="lehrer" class="tab-content">
+                <h2>Lehrer verwalten</h2>
+                <div class="card">
+                    <h3>Neuen Lehrer anlegen</h3>
+                    <div class="input-group">
+                        <input type="text" id="lehrerName" placeholder="Name des Lehrers">
+                        <input type="email" id="lehrerEmail" placeholder="E-Mail">
+                        <input type="password" id="lehrerPasswort" placeholder="Passwort" value="lehrer123">
+                        <button class="btn" onclick="lehrerHinzufuegen()">Lehrer anlegen</button>
+                    </div>
+                </div>
+                <div class="liste" id="lehrerListe">
+                    <!-- Lehrer werden hier angezeigt -->
+                </div>
+            </div>
+
+            <!-- Datenverwaltung Tab -->
+            <div id="daten" class="tab-content">
+                <h2>Datenverwaltung</h2>
+                <div class="card">
+                    <h3>Schuljahr</h3>
+                    <div class="input-group">
+                        <label>Aktuelles Schuljahr:</label>
+                        <input type="text" id="schuljahr" value="2025/26" placeholder="z.B. 2025/26">
+                        <button class="btn" onclick="schuljahrSpeichern()">Speichern</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Datenexport</h3>
+                    <div class="input-group">
+                        <button class="btn btn-success" onclick="datenExportieren('alle')">Alle Daten exportieren</button>
+                        <button class="btn btn-success" onclick="datenExportieren('bewertungen')">Nur Bewertungen exportieren</button>
+                        <button class="btn btn-success" onclick="datenExportieren('gruppen')">Nur Gruppen exportieren</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Daten löschen</h3>
+                    <div class="input-group">
+                        <button class="btn btn-danger" onclick="datenLoeschen('bewertungen')">Alle Bewertungen löschen</button>
+                        <button class="btn btn-danger" onclick="datenLoeschen('gruppen')">Alle Gruppen löschen</button>
+                        <button class="btn btn-danger" onclick="datenLoeschen('news')">Alle News löschen</button>
+                        <button class="btn btn-danger" onclick="datenLoeschen('alle')" style="background: #c0392b;">ALLE DATEN LÖSCHEN</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Statistiken</h3>
+                    <div id="statistiken">
+                        <!-- Statistiken werden hier angezeigt -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bewerten Tab -->
+            <div id="bewerten" class="tab-content">
+                <h2>Schüler bewerten</h2>
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>Filter Status:</label>
+                        <select id="bewertungsFilter" onchange="filterBewertungen()">
+                            <option value="alle">Alle</option>
+                            <option value="bewertet">Bewertet</option>
+                            <option value="nicht-bewertet">Noch nicht bewertet</option>
+                        </select>
+                        <label>Namen sortieren:</label>
+                        <select id="namenSortierung" onchange="filterBewertungen()">
+                            <option value="az">A-Z</option>
+                            <option value="za">Z-A</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="bewertungsListe">
+                    <!-- Zu bewertende Schüler -->
+                </div>
+                <div id="bewertungsRaster" class="bewertung-container hidden">
+                    <!-- Bewertungsbereich mit Tabs -->
+                    <div class="bewertung-tabs">
+                        <button class="bewertung-tab-btn active" onclick="openBewertungTab('bewertung')">Bewertung</button>
+                        <button class="bewertung-tab-btn" onclick="openBewertungTab('staerken')">Stärken</button>
+                    </div>
+                    
+                    <!-- Notenschnitt - bleibt immer sichtbar -->
+                    <div class="durchschnitt-sticky">
+                        Durchschnitt: <span id="durchschnittAnzeige">-</span>
+                    </div>
+                    
+                    <!-- Tab Bewertung -->
+                    <div id="bewertungTab" class="bewertung-tab-content active">
+                        <div id="bewertungsRasterContent">
+                            <!-- Bewertungsraster wird hier angezeigt -->
+                        </div>
+                    </div>
+                    
+                    <!-- Tab Stärken -->
+                    <div id="staerkenTab" class="bewertung-tab-content">
+                        <div id="staerkenCheckliste">
+                            <!-- Stärken-Checkliste wird hier angezeigt -->
+                        </div>
+                    </div>
+                    
+                    <div class="speichern-buttons">
+                        <button class="btn btn-success" onclick="bewertungSpeichern()">Speichern</button>
+                        <button class="btn btn-danger" onclick="bewertungAbbrechen()">Zurück</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vorlagen Tab -->
+            <div id="vorlagen" class="tab-content">
+                <h2>Bewertungsvorlagen</h2>
+                <div class="card">
+                    <h3>Neue Vorlage erstellen</h3>
+                    <div class="input-group">
+                        <input type="text" id="vorlagenName" placeholder="Name der Vorlage">
+                        <button class="btn" onclick="neueVorlageErstellen()">Erstellen</button>
+                    </div>
+                </div>
+                <div id="vorlagenEditor" class="hidden">
+                    <div class="card">
+                        <div class="vorlage-titel" id="vorlagenTitel"></div>
+                        <div class="reflexion-info">
+                            <strong>Reflexion (30% - fest)</strong> ist automatisch in jeder Vorlage enthalten.
+                        </div>
+                        <h3>Weitere Kategorien hinzufügen (max. 70%)</h3>
+                        <div class="input-group">
+                            <input type="text" id="kategorieName" placeholder="Kategorie-Name">
+                            <input type="number" id="kategorieGewichtung" placeholder="Gewichtung %" min="1" max="70">
+                            <button class="btn" onclick="kategorieHinzufuegen()">Hinzufügen</button>
+                        </div>
+                        <div id="gewichtungStatus" class="gewichtung-anzeige">
+                            Verwendete Gewichtung: <span id="aktuelleGewichtung">30%</span> / 100%
+                        </div>
+                        <div id="kategorienListe"></div>
+                        <button class="btn btn-success" onclick="vorlageSpeichern()">Vorlage speichern</button>
+                        <button class="btn btn-danger" onclick="vorlagenEditorSchließen()">Abbrechen</button>
+                    </div>
+                </div>
+                <div class="liste" id="vorlagenListe">
+                    <!-- Vorlagen werden hier angezeigt -->
+                </div>
+            </div>
+
+            <!-- Admin Vorlagen Tab (nur Admin) -->
+            <div id="adminvorlagen" class="tab-content">
+                <h2>System-Vorlagen bearbeiten</h2>
+                
+                <!-- Fächer verwalten -->
+                <div class="card">
+                    <div id="faecherVerwaltung">
+                        <!-- Fächer-Verwaltung wird hier angezeigt -->
+                    </div>
+                </div>
+                
+                <!-- Bewertungs-Checkpoints verwalten -->
+                <div class="card">
+                    <div id="checkpointsVerwaltung">
+                        <!-- Checkpoints-Verwaltung wird hier angezeigt -->
+                    </div>
+                </div>
+                
+                <!-- Standardformulierungen für Stärken -->
+                <div class="card">
+                    <h3>Standardformulierungen für Stärken</h3>
+                    <p><em>Verwenden Sie [NAME] als Platzhalter für den Schülernamen. Ohne [NAME] wird nur der Text verwendet.</em></p>
+                    <div id="staerkenFormulierungen">
+                        <!-- Formulierungen werden hier angezeigt -->
+                    </div>
+                    <button class="btn btn-success" onclick="staerkenFormulierungenSpeichern()">Speichern</button>
+                </div>
+                
+                <!-- Briefvorlage -->
+                <div class="card">
+                    <h3>Briefvorlage</h3>
+                    <p><em>Verwenden Sie [NAME] als Platzhalter für den Schülernamen.</em></p>
+                    <div class="input-group brief-input-group">
+                        <label>Anrede/Einleitung:</label>
+                        <textarea id="briefAnrede" rows="6" placeholder="Liebe/r [NAME]..." class="brief-textarea"></textarea>
+                    </div>
+                    <div class="input-group brief-input-group">
+                        <label>Schlussformel:</label>
+                        <textarea id="briefSchluss" rows="6" placeholder="Mit freundlichen Grüßen..." class="brief-textarea"></textarea>
+                    </div>
+                    <button class="btn btn-success" onclick="briefvorlageSpeichern()">Speichern</button>
+                </div>
+            </div>
+
+            <!-- Übersicht Tab -->
+            <div id="uebersicht" class="tab-content">
+                <h2>Meine Übersicht</h2>
+                
+                <!-- Filter-Bereich -->
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>Sortierung:</label>
+                        <select onchange="updateUebersichtFilter('sortierung', this.value)">
+                            <option value="name-az">Name A-Z</option>
+                            <option value="name-za">Name Z-A</option>
+                            <option value="note-auf">Note aufsteigend</option>
+                            <option value="note-ab">Note absteigend</option>
+                            <option value="datum">Bewertungsdatum</option>
+                        </select>
+                        
+                        <label>Status:</label>
+                        <select onchange="updateUebersichtFilter('status', this.value)">
+                            <option value="alle">Alle</option>
+                            <option value="bewertet">Nur bewertete</option>
+                            <option value="nicht-bewertet">Nur unbewertete</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Statistiken</h3>
+                    <div id="lehrerStatistiken">
+                        <!-- Statistiken werden hier angezeigt -->
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Meine Schüler & Bewertungen</h3>
+                    <div class="input-group">
+                        <button class="btn btn-success" onclick="meineSchuelerExportieren()">Meine Daten exportieren</button>
+                        <button class="btn" onclick="druckansichtÖffnen()">Druckansicht</button>
+                    </div>
+                </div>
+                <div class="liste" id="meineSchuelerListe">
+                    <!-- Schüler werden hier angezeigt -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Integration wird geladen -->
+    <script src="fireconfig.js"></script>
+    <script src="fireclient.js"></script>
+    <script src="main.js"></script>
+    <script src="login.js"></script>
+    <script src="news.js"></script>
+    <script src="themen.js"></script>
+    <script src="bewertung.js"></script>
+    <script src="pdf.js"></script>
+</body>
+</html>

@@ -8,20 +8,32 @@ function getNetlifyEnvVar(varName) {
         return window._env[varName];
     }
     
-    // Kein Fallback - Firebase ist zwingend erforderlich
-    throw new Error(`Firebase-Konfiguration fehlt: ${varName}`);
+    // Fallback: Versuche aus process.env zu lesen (für lokale Entwicklung)
+    if (typeof process !== 'undefined' && process.env && process.env[varName]) {
+        return process.env[varName];
+    }
+    
+    console.warn(`Environment Variable ${varName} nicht gefunden`);
+    return null;
 }
 
-// Firebase-Konfiguration (MUSS über Netlify Environment Variables gesetzt werden)
-const firebaseConfig = {
-    apiKey: getNetlifyEnvVar('FIREBASE_API_KEY'),
-    authDomain: getNetlifyEnvVar('FIREBASE_AUTH_DOMAIN'),
-    projectId: getNetlifyEnvVar('FIREBASE_PROJECT_ID'),
-    storageBucket: getNetlifyEnvVar('FIREBASE_STORAGE_BUCKET'),
-    messagingSenderId: getNetlifyEnvVar('FIREBASE_MESSAGING_SENDER_ID'),
-    appId: getNetlifyEnvVar('FIREBASE_APP_ID'),
-    databaseURL: getNetlifyEnvVar('FIREBASE_DATABASE_URL')
-};
+// Firebase-Konfiguration laden
+let firebaseConfig = {};
+
+try {
+    firebaseConfig = {
+        apiKey: getNetlifyEnvVar('FIREBASE_API_KEY'),
+        authDomain: getNetlifyEnvVar('FIREBASE_AUTH_DOMAIN'),
+        projectId: getNetlifyEnvVar('FIREBASE_PROJECT_ID'),
+        storageBucket: getNetlifyEnvVar('FIREBASE_STORAGE_BUCKET'),
+        messagingSenderId: getNetlifyEnvVar('FIREBASE_MESSAGING_SENDER_ID'),
+        appId: getNetlifyEnvVar('FIREBASE_APP_ID'),
+        databaseURL: getNetlifyEnvVar('FIREBASE_DATABASE_URL')
+    };
+} catch (error) {
+    console.error('❌ Fehler beim Laden der Firebase-Konfiguration:', error);
+    firebaseConfig = {};
+}
 
 // Firebase Services Konfiguration
 const FIREBASE_SERVICES = {
@@ -82,6 +94,13 @@ function validateFirebaseConfig() {
     
     if (missingFields.length > 0) {
         console.error('❌ Firebase-Konfiguration unvollständig! Fehlende Felder:', missingFields.join(', '));
+        console.error('🔍 Aktuelle Konfiguration:', {
+            apiKey: firebaseConfig.apiKey ? '[GESETZT]' : '[FEHLT]',
+            authDomain: firebaseConfig.authDomain ? '[GESETZT]' : '[FEHLT]',
+            projectId: firebaseConfig.projectId ? '[GESETZT]' : '[FEHLT]',
+            storageBucket: firebaseConfig.storageBucket ? '[GESETZT]' : '[FEHLT]',
+            appId: firebaseConfig.appId ? '[GESETZT]' : '[FEHLT]'
+        });
         return false;
     }
     
@@ -105,37 +124,67 @@ if (typeof window !== 'undefined') {
         window.firebaseConfigValid = configValid;
         
         if (!configValid) {
-            // Kritischer Fehler - App kann nicht starten
-            const errorMsg = 'Firebase-Konfiguration fehlt! Bitte kontaktieren Sie den Administrator.';
-            if (document.body) {
-                document.body.innerHTML = `
-                    <div style="
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        min-height: 100vh;
-                        background: #e74c3c;
+            // Warnung anzeigen, aber nicht blockieren
+            console.warn('⚠️ Firebase-Konfiguration unvollständig - App läuft im eingeschränkten Modus');
+            
+            // Zeige eine weniger invasive Warnung
+            setTimeout(() => {
+                if (document.body && !configValid) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.style.cssText = `
+                        position: fixed;
+                        top: 10px;
+                        right: 10px;
+                        background: #f39c12;
                         color: white;
+                        padding: 15px 20px;
+                        border-radius: 8px;
                         font-family: Arial, sans-serif;
-                        text-align: center;
-                        padding: 20px;
-                    ">
-                        <div>
-                            <h1>⚠️ Konfigurationsfehler</h1>
-                            <p>${errorMsg}</p>
-                        </div>
-                    </div>
-                `;
-            }
-            throw new Error(errorMsg);
+                        font-size: 14px;
+                        max-width: 300px;
+                        z-index: 9999;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                        cursor: pointer;
+                    `;
+                    warningDiv.innerHTML = `
+                        <strong>⚠️ Firebase-Konfiguration</strong><br>
+                        Einige Environment Variables fehlen.<br>
+                        <small>Klicken zum Schließen</small>
+                    `;
+                    warningDiv.onclick = () => warningDiv.remove();
+                    
+                    document.body.appendChild(warningDiv);
+                    
+                    // Automatisch nach 10 Sekunden entfernen
+                    setTimeout(() => {
+                        if (warningDiv.parentNode) {
+                            warningDiv.remove();
+                        }
+                    }, 10000);
+                }
+            }, 2000);
         }
     } catch (error) {
-        console.error('❌ KRITISCHER FEHLER:', error.message);
+        console.error('❌ KRITISCHER FEHLER bei Firebase-Konfiguration:', error.message);
         window.firebaseConfigValid = false;
     }
 }
 
 // Logging für Produktion
-if (typeof window !== 'undefined' && window.firebaseConfigValid) {
-    console.log('🔥 Firebase Konfiguration geladen für Projekt:', firebaseConfig.projectId);
+if (typeof window !== 'undefined') {
+    if (firebaseConfig.projectId) {
+        console.log('🔥 Firebase Konfiguration geladen für Projekt:', firebaseConfig.projectId);
+    } else {
+        console.log('⚠️ Firebase-Projekt-ID nicht verfügbar');
+    }
+    
+    // Debug-Info für Entwicklung
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        console.log('🛠️ Entwicklungsmodus erkannt');
+        console.log('🔍 Environment Variables Status:', {
+            '_env verfügbar': !!window._env,
+            'FIREBASE_API_KEY': window._env?.FIREBASE_API_KEY ? '[GESETZT]' : '[FEHLT]',
+            'FIREBASE_PROJECT_ID': window._env?.FIREBASE_PROJECT_ID ? '[GESETZT]' : '[FEHLT]'
+        });
+    }
 }

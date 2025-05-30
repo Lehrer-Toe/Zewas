@@ -48,7 +48,9 @@ window.addEventListener('load', function() {
     }
 });
 
-console.log('🚀 Main.js (Online-Only Modus) geladen und bereit');// Export-Funktionen
+console.log('🚀 Main.js (Online-Only Modus) geladen und bereit');
+
+// Export-Funktionen
 async function meineSchuelerExportieren() {
     alert('Export-Funktion wird implementiert...');
     
@@ -263,7 +265,9 @@ async function datenLoeschen(typ) {
             alert(`Fehler beim Löschen: ${error.message}`);
         }
     }
-}// Übersicht-Tab mit Filter
+}
+
+// Übersicht-Tab mit Filter
 let uebersichtFilter = {
     sortierung: 'name-az',
     status: 'alle'
@@ -418,7 +422,9 @@ function filterMeineSchueler(schueler) {
 function updateUebersichtFilter(typ, wert) {
     uebersichtFilter[typ] = wert;
     loadMeineSchueler();
-}// Admin-Vorlagen (umbenannt von Briefvorlagen)
+}
+
+// Admin-Vorlagen (umbenannt von Briefvorlagen)
 function loadAdminVorlagen() {
     if (currentUser.role !== 'admin') {
         document.getElementById('adminvorlagen').innerHTML = '<div class="card"><p>Keine Berechtigung.</p></div>';
@@ -560,7 +566,9 @@ async function briefvorlageSpeichern() {
         console.error('❌ Fehler beim Speichern der Briefvorlage:', error);
         alert(`Fehler beim Speichern: ${error.message}`);
     }
-}// Admin-Funktionen für Bewertungs-Checkpoints
+}
+
+// Admin-Funktionen für Bewertungs-Checkpoints
 function loadCheckpointsVerwaltung() {
     if (currentUser.role !== 'admin') return;
     
@@ -722,7 +730,9 @@ async function neuerCheckpoint(kategorie) {
             alert(`Fehler beim Speichern: ${error.message}`);
         }
     }
-}// Admin-Funktionen für Fächer
+}
+
+// Admin-Funktionen für Fächer
 function loadFaecherVerwaltung() {
     if (currentUser.role !== 'admin') return;
     
@@ -877,7 +887,9 @@ async function neuesFachHinzufuegen() {
         console.error('❌ Fehler beim Hinzufügen des Fachs:', error);
         alert(`Fehler beim Speichern: ${error.message}`);
     }
-}// Lehrer-Verwaltung (erweitert)
+}
+
+// Lehrer-Verwaltung (erweitert)
 function loadLehrer() {
     const liste = document.getElementById('lehrerListe');
     if (!liste) return;
@@ -1119,7 +1131,9 @@ async function lehrerLoeschen(lehrerId) {
             alert(`Fehler beim Löschen: ${error.message}`);
         }
     }
-}function schuelerHinzufuegen() {
+}
+
+function schuelerHinzufuegen() {
     const container = document.getElementById('schuelerListe');
     const newRow = document.createElement('div');
     newRow.className = 'input-group schueler-row';
@@ -1442,7 +1456,9 @@ async function gruppeLoeschen(gruppeId) {
             alert(`Fehler beim Löschen: ${error.message}`);
         }
     }
-}// Tab-Navigation
+}
+
+// Tab-Navigation
 function openTab(tabName) {
     const contents = document.querySelectorAll('.tab-content');
     const buttons = document.querySelectorAll('.tab-btn');
@@ -1539,21 +1555,23 @@ function loadSchuelerLehrerAuswahl() {
     fachSelects.forEach(select => {
         select.innerHTML = '<option value="">Fach wählen...</option>' + fachOptions;
     });
-}// App-Initialisierung - ONLINE-ONLY MODUS
+}
+
+// App-Initialisierung - ONLINE-ONLY MODUS
 function initializeApp() {
     console.log('🚀 Initialisiere App im Online-Modus...');
     
     try {
         // Warte auf Firebase - App startet erst, wenn Firebase bereit ist
         if (window.firebaseInitialized) {
-            console.log('🔥 Firebase bereits initialisiert - lade Daten');
-            loadInitialData();
+            console.log('🔥 Firebase bereits initialisiert - bereit für Login');
+            // KEINE automatische Datenladung - nur bei Login
         } else {
             console.log('⏳ Warte auf Firebase-Initialisierung...');
             // Event-Listener für Firebase
             window.addEventListener('firebaseReady', () => {
-                console.log('🔥 Firebase ready - lade Daten');
-                loadInitialData();
+                console.log('🔥 Firebase ready - bereit für Login');
+                // KEINE automatische Datenladung - nur bei Login
             });
             
             // Timeout für Firebase-Initialisierung
@@ -1613,163 +1631,7 @@ function showFirebaseError(message) {
     document.body.appendChild(errorDiv);
 }
 
-// Initiale Daten aus Firebase laden
-async function loadInitialData() {
-    try {
-        console.log('📊 Lade initiale Daten aus Firebase...');
-        
-        // Lade App-Einstellungen
-        const settingsResult = await window.FirebaseClient.load('settings');
-        if (settingsResult.success && settingsResult.data.length > 0) {
-            const settings = settingsResult.data.find(s => s.id === 'app-settings');
-            if (settings) {
-                if (settings.schuljahr) {
-                    window.schuljahr = settings.schuljahr;
-                    schuljahr = settings.schuljahr;
-                }
-                if (settings.alleFaecherGlobal) {
-                    window.alleFaecherGlobal = settings.alleFaecherGlobal;
-                    alleFaecherGlobal = settings.alleFaecherGlobal;
-                }
-                if (settings.bewertungsCheckpoints) {
-                    window.bewertungsCheckpoints = settings.bewertungsCheckpoints;
-                    bewertungsCheckpoints = settings.bewertungsCheckpoints;
-                }
-                if (settings.briefvorlage) {
-                    window.briefvorlage = settings.briefvorlage;
-                    briefvorlage = settings.briefvorlage;
-                }
-                if (settings.staerkenFormulierungen) {
-                    window.staerkenFormulierungen = settings.staerkenFormulierungen;
-                    staerkenFormulierungen = settings.staerkenFormulierungen;
-                }
-            }
-            console.log('⚙️ App-Einstellungen geladen');
-        } else {
-            console.warn('⚠️ Keine App-Einstellungen gefunden');
-            
-            // Wenn Admin und keine Einstellungen, Setup starten
-            if (currentUser?.role === 'admin') {
-                console.log('👑 Admin-Benutzer erkannt - prüfe Setup');
-                checkAdminSetup();
-            }
-        }
-        
-        // Lade Fächer falls noch nicht geladen
-        if (Object.keys(alleFaecherGlobal).length === 0) {
-            const faecherResult = await window.FirebaseClient.load('faecher');
-            if (faecherResult.success && faecherResult.data.length > 0) {
-                const faecher = faecherResult.data.find(f => f.id === 'standard-faecher');
-                if (faecher) {
-                    window.alleFaecherGlobal = faecher;
-                    alleFaecherGlobal = faecher;
-                    console.log('📚 Fächer geladen');
-                }
-            }
-        }
-        
-        // Lade Checkpoints falls noch nicht geladen
-        if (Object.keys(bewertungsCheckpoints).length === 0) {
-            const checkpointsResult = await window.FirebaseClient.load('checkpoints');
-            if (checkpointsResult.success && checkpointsResult.data.length > 0) {
-                const checkpoints = checkpointsResult.data.find(c => c.id === 'bewertungs-checkpoints');
-                if (checkpoints) {
-                    window.bewertungsCheckpoints = checkpoints;
-                    bewertungsCheckpoints = checkpoints;
-                    console.log('✅ Bewertungs-Checkpoints geladen');
-                }
-            }
-        }
-        
-        // Lade Briefvorlagen falls noch nicht geladen
-        if (!briefvorlage.anrede || !briefvorlage.schluss) {
-            const briefvorlagenResult = await window.FirebaseClient.load('briefvorlagen');
-            if (briefvorlagenResult.success && briefvorlagenResult.data.length > 0) {
-                const vorlage = briefvorlagenResult.data.find(v => v.id === 'standard-vorlage');
-                if (vorlage) {
-                    window.briefvorlage = vorlage;
-                    briefvorlage = vorlage;
-                    console.log('📝 Briefvorlage geladen');
-                }
-                
-                const formulierungen = briefvorlagenResult.data.find(v => v.id === 'staerken-formulierungen');
-                if (formulierungen) {
-                    window.staerkenFormulierungen = formulierungen;
-                    staerkenFormulierungen = formulierungen;
-                    console.log('📝 Stärken-Formulierungen geladen');
-                }
-            }
-        }
-        
-        // Lade alle anderen Daten
-        const dataToLoad = {
-            'users': 'users',
-            'themen': 'themen',
-            'gruppen': 'gruppen',
-            'bewertungen': 'bewertungen',
-            'news': 'news',
-            'vorlagen': 'vorlagen'
-        };
-        
-        for (const [collection, globalVar] of Object.entries(dataToLoad)) {
-            const result = await window.FirebaseClient.load(collection);
-            if (result.success) {
-                window[globalVar] = result.data;
-                // Auch die lokalen Variablen aktualisieren
-                if (typeof window[globalVar] !== 'undefined') {
-                    eval(`${globalVar} = window.${globalVar}`);
-                }
-                console.log(`✅ ${collection} geladen (${result.data.length} Einträge)`);
-            } else {
-                console.warn(`⚠️ Fehler beim Laden von ${collection}`);
-            }
-        }
-        
-        console.log('✅ Alle Daten geladen');
-        
-        // Initialisiere UI nach Datenladen
-        loadSchuelerLehrerAuswahl();
-        loadTabInhalte();
-        
-        // Event auslösen, dass Daten geladen sind
-        window.dispatchEvent(new CustomEvent('dataLoaded', { detail: { success: true } }));
-        
-    } catch (error) {
-        console.error('❌ Fehler beim Laden der Daten:', error);
-        showFirebaseError('Fehler beim Laden der Daten aus Firebase. Bitte laden Sie die Seite neu.');
-    }
-}
-
-// Admin-Setup prüfen
-async function checkAdminSetup() {
-    try {
-        console.log('🔧 Prüfe Admin-Setup...');
-        
-        // Prüfe ob bereits Einstellungen vorhanden sind
-        const settingsResult = await window.FirebaseClient.load('settings');
-        if (!settingsResult.success || settingsResult.data.length === 0) {
-            console.log('🚀 Erstmalige Einrichtung erforderlich');
-            
-            // Lade Admin-Setup-Script
-            const script = document.createElement('script');
-            script.src = 'admin-setup.js';
-            script.onload = () => {
-                if (typeof window.AdminSetup !== 'undefined') {
-                    console.log('🔧 Admin-Setup-Script geladen, starte Einrichtung...');
-                    window.dispatchEvent(new CustomEvent('adminLoginSuccess'));
-                    window.AdminSetup.checkAndRun();
-                }
-            };
-            document.head.appendChild(script);
-        } else {
-            console.log('✅ System bereits eingerichtet');
-        }
-    } catch (error) {
-        console.warn('⚠️ Admin-Setup-Prüfung fehlgeschlagen:', error);
-    }
-}
-
-// Initialisiere Inhalte für alle Tabs
+// Initialisiere Inhalte für alle Tabs - wird nach Login aufgerufen
 function loadTabInhalte() {
     loadNews();
     loadThemen();
@@ -1787,7 +1649,9 @@ function loadTabInhalte() {
         if (tabId === 'uebersicht') loadUebersicht();
         if (tabId === 'adminvorlagen') loadAdminVorlagen();
     }
-}// Globale Variablen für Datenspeicherung - ONLINE-ONLY MODUS
+}
+
+// Globale Variablen für Datenspeicherung - ONLINE-ONLY MODUS
 let currentUser = null;
 
 // Daten-Container als leere Arrays/Objekte initialisieren - werden aus Firebase geladen

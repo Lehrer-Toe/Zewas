@@ -618,6 +618,11 @@ function loadCheckpointsVerwaltung() {
     
     try {
         Object.entries(bewertungsCheckpoints).forEach(([kategorie, checkpoints]) => {
+            // Ignoriere Firebase-Metadaten
+            if (kategorie === 'id' || kategorie === 'lastModified') {
+                return;
+            }
+            
             // Sicherheitsprüfung: Stelle sicher, dass checkpoints ein Array ist
             if (!Array.isArray(checkpoints)) {
                 console.warn(`⚠️ Checkpoints für ${kategorie} ist kein Array:`, checkpoints);
@@ -805,6 +810,11 @@ function loadFaecherVerwaltung() {
     
     try {
         Object.entries(alleFaecherGlobal).forEach(([kuerzel, name]) => {
+            // Ignoriere Firebase-Metadaten
+            if (kuerzel === 'id' || kuerzel === 'lastModified') {
+                return;
+            }
+            
             html += `
                 <div class="fach-item">
                     <input type="text" value="${name}" id="fach-${kuerzel}" onchange="updateFachName('${kuerzel}', this.value)">
@@ -1658,3 +1668,14 @@ let briefvorlage = window.briefvorlage;
 let staerkenFormulierungen = window.staerkenFormulierungen;
 
 let aktuelleGruppeEdit = null;
+
+// GLOBALE Registrierung aller wichtigen Funktionen
+window.loadGruppen = loadGruppen;
+window.loadLehrer = loadLehrer;
+window.loadDatenverwaltung = loadDatenverwaltung;
+window.loadVorlagen = loadVorlagen;
+window.loadUebersicht = loadUebersicht;
+window.loadAdminVorlagen = loadAdminVorlagen;
+window.openTab = openTab;
+
+console.log('🚀 Main.js - Alle Funktionen global registriert');

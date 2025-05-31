@@ -208,44 +208,63 @@ function loadBewertungsTab(vorhandeneBewertung) {
 function loadStaerkenTab(vorhandeneBewertung) {
     const container = document.getElementById('staerkenCheckliste');
     
+    // Prüfe ob bewertungsCheckpoints existiert und ein Object ist
+    if (!bewertungsCheckpoints || typeof bewertungsCheckpoints !== 'object') {
+        container.innerHTML = '<h3>Stärken bewerten</h3><div class="card"><p>Bewertungs-Checkpoints werden geladen...</p></div>';
+        return;
+    }
+    
     let html = '<h3>Stärken bewerten</h3>';
     
-    Object.keys(bewertungsCheckpoints).forEach(kategorie => {
-        const aktivierte = vorhandeneBewertung?.staerken?.[kategorie] || [];
-        
-        html += `
-            <div class="staerken-kategorie">
-                <div class="staerken-kategorie-titel">
-                    ${getKategorieIconForBewertung(kategorie)} ${kategorie}
-                </div>
-                <div class="staerken-liste">
-        `;
-        
-        bewertungsCheckpoints[kategorie].forEach((text, index) => {
-            const checked = aktivierte.includes(index) ? 'checked' : '';
-            const itemClass = aktivierte.includes(index) ? 'checked' : '';
+    try {
+        Object.keys(bewertungsCheckpoints).forEach(kategorie => {
+            const checkpoints = bewertungsCheckpoints[kategorie];
+            
+            // Sicherheitsprüfung: Stelle sicher, dass checkpoints ein Array ist
+            if (!Array.isArray(checkpoints)) {
+                console.warn(`⚠️ Checkpoints für ${kategorie} ist kein Array:`, checkpoints);
+                return;
+            }
+            
+            const aktivierte = vorhandeneBewertung?.staerken?.[kategorie] || [];
             
             html += `
-                <div class="staerken-item ${itemClass}">
-                    <input type="checkbox" class="staerken-checkbox" 
-                           ${checked}
-                           onchange="staerkeToggle('${kategorie}', ${index}, this)">
-                    <span class="staerken-text" onclick="toggleCheckbox('${kategorie}', ${index})">${text}</span>
-                </div>
+                <div class="staerken-kategorie">
+                    <div class="staerken-kategorie-titel">
+                        ${getKategorieIconForBewertung(kategorie)} ${kategorie}
+                    </div>
+                    <div class="staerken-liste">
             `;
+            
+            checkpoints.forEach((text, index) => {
+                const checked = aktivierte.includes(index) ? 'checked' : '';
+                const itemClass = aktivierte.includes(index) ? 'checked' : '';
+                
+                html += `
+                    <div class="staerken-item ${itemClass}">
+                        <input type="checkbox" class="staerken-checkbox" 
+                               ${checked}
+                               onchange="staerkeToggle('${kategorie}', ${index}, this)">
+                        <span class="staerken-text" onclick="toggleCheckbox('${kategorie}', ${index})">${text}</span>
+                    </div>
+                `;
+            });
+            
+            html += '</div></div>';
         });
         
-        html += '</div></div>';
-    });
-    
-    html += `
-        <div class="freitext-bereich">
-            <label><strong>📝 Weitere Beobachtungen oder individuelle Stärken:</strong></label>
-            <textarea class="freitext-textarea" 
-                      placeholder="Hier können Sie weitere Beobachtungen eintragen..."
-                      onchange="freitextChanged(this)">${vorhandeneBewertung?.freitext || ''}</textarea>
-        </div>
-    `;
+        html += `
+            <div class="freitext-bereich">
+                <label><strong>📝 Weitere Beobachtungen oder individuelle Stärken:</strong></label>
+                <textarea class="freitext-textarea" 
+                          placeholder="Hier können Sie weitere Beobachtungen eintragen..."
+                          onchange="freitextChanged(this)">${vorhandeneBewertung?.freitext || ''}</textarea>
+            </div>
+        `;
+    } catch (error) {
+        console.error('❌ Fehler beim Laden der Stärken-Checkliste:', error);
+        html = '<h3>Stärken bewerten</h3><div class="card"><p>Fehler beim Laden der Stärken. Bitte laden Sie die Seite neu.</p></div>';
+    }
     
     container.innerHTML = html;
 }
@@ -401,36 +420,73 @@ function endnoteGeaendert() {
     // Validation könnte hier hinzugefügt werden
 }
 
-function bewertungSpeichern() {
+async function bewertungSpeichern() {
+    if (!window.firebaseInitialized) {
+        alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
+        return;
+    }
+    
     const endnote = parseFloat(document.getElementById('endnote').value);
     if (!endnote || endnote < 1 || endnote > 6) {
         alert('Bitte geben Sie eine gültige Endnote (1.0-6.0) ein!');
         return;
     }
     
-    // Vorhandene Bewertung aktualisieren oder neue erstellen
-    const existingIndex = bewertungen.findIndex(b => b.schuelerId === aktuelleBewertung.schuelerId);
-    const bewertungData = {
-        schuelerId: aktuelleBewertung.schuelerId,
-        schuelerName: aktuelleBewertung.schuelerName,
-        thema: aktuelleBewertung.thema,
-        lehrer: currentUser.name,
-        vorlage: aktuelleVorlage.name,
-        noten: [...aktuelleBewertung.noten],
-        endnote: endnote,
-        datum: new Date().toLocaleDateString('de-DE'),
-        staerken: { ...aktuelleBewertung.staerken },
-        freitext: aktuelleBewertung.freitext
-    };
+    // UI blockieren während des Speichervorgangs
+    const saveButton = document.querySelector('button[onclick="bewertungSpeichern()"]');
+    const originalText = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Speichern...';
     
-    if (existingIndex >= 0) {
-        bewertungen[existingIndex] = bewertungData;
-    } else {
-        bewertungen.push(bewertungData);
+    try {
+        // Vorhandene Bewertung aktualisieren oder neue erstellen
+        const existingIndex = bewertungen.findIndex(b => b.schuelerId === aktuelleBewertung.schuelerId);
+        const bewertungData = {
+            schuelerId: aktuelleBewertung.schuelerId,
+            schuelerName: aktuelleBewertung.schuelerName,
+            thema: aktuelleBewertung.thema,
+            lehrer: currentUser.name,
+            vorlage: aktuelleVorlage.name,
+            noten: [...aktuelleBewertung.noten],
+            endnote: endnote,
+            datum: new Date().toLocaleDateString('de-DE'),
+            staerken: { ...aktuelleBewertung.staerken },
+            freitext: aktuelleBewertung.freitext,
+            created: new Date().toISOString()
+        };
+        
+        // Firebase speichern
+        let result;
+        if (existingIndex >= 0) {
+            // Update existing
+            const existingId = bewertungen[existingIndex].id;
+            result = await window.FirebaseClient.save('bewertungen', bewertungData, existingId);
+            if (result.success) {
+                bewertungen[existingIndex] = { ...bewertungData, id: existingId };
+            }
+        } else {
+            // Create new
+            result = await window.FirebaseClient.save('bewertungen', bewertungData);
+            if (result.success) {
+                bewertungData.id = result.id;
+                bewertungen.push(bewertungData);
+            }
+        }
+        
+        if (result.success) {
+            await addNews('Bewertung gespeichert', `${aktuelleBewertung.schuelerName} wurde mit ${endnote} bewertet.`);
+            bewertungAbbrechen();
+        } else {
+            throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+        }
+    } catch (error) {
+        console.error('❌ Fehler beim Speichern der Bewertung:', error);
+        alert(`Fehler beim Speichern: ${error.message}`);
+    } finally {
+        // UI entsperren
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
     }
-    
-    addNews('Bewertung gespeichert', `${aktuelleBewertung.schuelerName} wurde mit ${endnote} bewertet.`);
-    bewertungAbbrechen();
 }
 
 function bewertungAbbrechen() {
@@ -563,7 +619,12 @@ function kategorieEntfernen(index) {
     updateGewichtungStatus();
 }
 
-function vorlageSpeichern() {
+async function vorlageSpeichern() {
+    if (!window.firebaseInitialized) {
+        alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
+        return;
+    }
+    
     if (aktuelleVorlage.kategorien.length === 0) {
         alert('Bitte fügen Sie mindestens eine Kategorie hinzu!');
         return;
@@ -579,16 +640,55 @@ function vorlageSpeichern() {
         vorlagen[currentUser.email] = [];
     }
     
-    // Prüfe ob bearbeitet oder neu erstellt wird
-    const existingIndex = vorlagen[currentUser.email].findIndex(v => v.name === aktuelleVorlage.name);
-    if (existingIndex >= 0) {
-        vorlagen[currentUser.email][existingIndex] = { ...aktuelleVorlage };
-    } else {
-        vorlagen[currentUser.email].push({ ...aktuelleVorlage });
-    }
+    // UI blockieren während des Speichervorgangs
+    const saveButton = document.querySelector('button[onclick="vorlageSpeichern()"]');
+    const originalText = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Speichern...';
     
-    vorlagenEditorSchließen();
-    loadVorlagen();
+    try {
+        // Prüfe ob bearbeitet oder neu erstellt wird
+        const existingIndex = vorlagen[currentUser.email].findIndex(v => v.name === aktuelleVorlage.name);
+        
+        const vorlageData = {
+            ...aktuelleVorlage,
+            owner: currentUser.email,
+            created: new Date().toISOString()
+        };
+        
+        // Firebase speichern
+        let result;
+        if (existingIndex >= 0) {
+            // Update existing
+            const existingId = vorlagen[currentUser.email][existingIndex].id;
+            result = await window.FirebaseClient.save('vorlagen', vorlageData, existingId);
+            if (result.success) {
+                vorlageData.id = existingId;
+                vorlagen[currentUser.email][existingIndex] = vorlageData;
+            }
+        } else {
+            // Create new
+            result = await window.FirebaseClient.save('vorlagen', vorlageData);
+            if (result.success) {
+                vorlageData.id = result.id;
+                vorlagen[currentUser.email].push(vorlageData);
+            }
+        }
+        
+        if (result.success) {
+            vorlagenEditorSchließen();
+            loadVorlagen();
+        } else {
+            throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+        }
+    } catch (error) {
+        console.error('❌ Fehler beim Speichern der Vorlage:', error);
+        alert(`Fehler beim Speichern: ${error.message}`);
+    } finally {
+        // UI entsperren
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
+    }
 }
 
 function vorlagenEditorSchließen() {
@@ -598,10 +698,31 @@ function vorlagenEditorSchließen() {
     aktuelleVorlage = null;
 }
 
-function vorlageLoeschen(index) {
+async function vorlageLoeschen(index) {
+    if (!window.firebaseInitialized) {
+        alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
+        return;
+    }
+    
     if (confirm('Vorlage wirklich löschen?')) {
-        vorlagen[currentUser.email].splice(index, 1);
-        loadVorlagen();
+        try {
+            const vorlage = vorlagen[currentUser.email][index];
+            
+            // Firebase löschen
+            if (vorlage.id) {
+                const result = await window.FirebaseClient.delete('vorlagen', vorlage.id);
+                if (!result.success) {
+                    throw new Error(result.error || 'Unbekannter Fehler beim Löschen');
+                }
+            }
+            
+            // Lokal löschen
+            vorlagen[currentUser.email].splice(index, 1);
+            loadVorlagen();
+        } catch (error) {
+            console.error('❌ Fehler beim Löschen der Vorlage:', error);
+            alert(`Fehler beim Löschen: ${error.message}`);
+        }
     }
 }
 
@@ -615,3 +736,23 @@ function vorlageBearbeiten(index) {
     updateKategorienListe();
     updateGewichtungStatus();
 }
+
+// Hilfsfunktion für PDF-Button-Status
+function updatePDFButtonStatus(schuelerId) {
+    const bewertung = bewertungen.find(b => b.schuelerId === schuelerId);
+    const button = document.querySelector(`[onclick*="${schuelerId}"]`);
+    
+    if (button && button.textContent === 'PDF') {
+        const verfuegbar = bewertung && bewertung.endnote && bewertung.staerken && Object.keys(bewertung.staerken).length > 0;
+        
+        if (verfuegbar) {
+            button.className = button.className.replace('pdf-btn-disabled', 'pdf-btn-enabled');
+            button.removeAttribute('disabled');
+        } else {
+            button.className = button.className.replace('pdf-btn-enabled', 'pdf-btn-disabled');
+            button.setAttribute('disabled', 'true');
+        }
+    }
+}
+
+console.log('✅ Bewertungs-System geladen');

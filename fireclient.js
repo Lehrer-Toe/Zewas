@@ -226,7 +226,8 @@ async function loginUser(email, password) {
                     email: user.email,
                     name: userData.name,
                     role: userData.role,
-                    uid: user.uid
+                    uid: user.uid,
+                    id: user.uid
                 }
             };
         } else {
@@ -246,7 +247,8 @@ async function loginUser(email, password) {
                     email: user.email,
                     name: userData.name,
                     role: userData.role,
-                    uid: user.uid
+                    uid: user.uid,
+                    id: user.uid
                 }
             };
         }
@@ -267,7 +269,9 @@ function translateFirebaseError(error) {
         'auth/invalid-email': 'Ungültige E-Mail-Adresse',
         'auth/user-disabled': 'Benutzerkonto deaktiviert',
         'auth/too-many-requests': 'Zu viele Anmeldeversuche. Bitte später erneut versuchen.',
-        'auth/network-request-failed': 'Netzwerkfehler. Prüfen Sie Ihre Internetverbindung.'
+        'auth/network-request-failed': 'Netzwerkfehler. Prüfen Sie Ihre Internetverbindung.',
+        'auth/email-already-in-use': 'Diese E-Mail-Adresse wird bereits verwendet',
+        'auth/weak-password': 'Das Passwort ist zu schwach'
     };
     
     return translations[error.code] || error.message || 'Unbekannter Fehler';
@@ -426,58 +430,101 @@ async function createUser(email, password, userData) {
         throw new Error('Firebase nicht initialisiert');
     }
     
-    // Aktuellen Admin-Benutzer merken
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-        throw new Error('Kein Administrator angemeldet');
-    }
-    
     try {
         // Benutzer in Firebase Auth erstellen
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const newUser = userCredential.user;
+        const user = userCredential.user;
         
-        // Benutzerdaten in Firestore speichern (während der neue Benutzer angemeldet ist)
-        await db.collection('users').doc(newUser.uid).set({
+        // Benutzerdaten in Firestore speichern
+        await db.collection('users').doc(user.uid).set({
             ...userData,
             email: email,
+            id: user.uid,
             created: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Den neuen Benutzer abmelden
-        await auth.signOut();
-        
-        // Den ursprünglichen Admin wieder anmelden
-        // Dafür müssen wir das Admin-Passwort haben oder einen anderen Weg finden
-        // Alternativ: Seite neu laden, damit der Admin sich wieder anmelden muss
-        
         console.log(`✅ Benutzer ${email} erstellt`);
-        console.log('ℹ️ Bitte melden Sie sich als Administrator wieder an');
-        
-        // Hinweis für den Benutzer anzeigen
-        setTimeout(() => {
-            alert('Benutzer wurde erfolgreich erstellt. Sie werden zur Anmeldung weitergeleitet.');
-            window.location.reload();
-        }, 1000);
-        
-        return { success: true, uid: newUser.uid, requiresRelogin: true };
+        return { success: true, uid: user.uid };
     } catch (error) {
         console.error('❌ Benutzer konnte nicht erstellt werden:', error);
-        
-        // Falls ein Fehler auftritt, versuche den ursprünglichen Benutzer wieder anzumelden
-        try {
-            if (currentUser && auth.currentUser?.uid !== currentUser.uid) {
-                await auth.signOut();
-                // Seite neu laden, damit sich der Admin wieder anmelden kann
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-        } catch (reloginError) {
-            console.error('❌ Fehler beim Wiederherstellen der Admin-Anmeldung:', reloginError);
-        }
-        
         return { success: false, error: translateFirebaseError(error) };
+    }
+}
+
+// Benutzer löschen (für Admin) - NEUE FUNKTION
+async function deleteUser(userId) {
+    if (!firebaseInitialized || !auth || !db) {
+        throw new Error('Firebase nicht initialisiert');
+    }
+    
+    try {
+        // Firestore-Dokument löschen
+        await db.collection('users').doc(userId).delete();
+        
+        // Hinweis: Firebase Auth Benutzer können nicht direkt gelöscht werden
+        // Das muss über Cloud Functions gemacht werden
+        console.log(`✅ Benutzerdokument ${userId} gelöscht`);
+        console.log('⚠️ Hinweis: Auth-Benutzer muss manuell in Firebase Console gelöscht werden');
+        
+        return { success: true, note: 'Firestore-Dokument gelöscht. Auth-Benutzer muss manuell gelöscht werden.' };
+    } catch (error) {
+        console.error('❌ Benutzer konnte nicht gelöscht werden:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// Alle Benutzer direkt aus Firebase laden - NEUE FUNKTION
+async function loadAllUsers() {
+    if (!firebaseInitialized || !db) {
+        throw new Error('Firebase nicht initialisiert');
+    }
+    
+    try {
+        const snapshot = await db.collection('users').get();
+        const users = [];
+        
+        snapshot.forEach(doc => {
+            const userData = doc.data();
+            users.push({
+                id: doc.id,
+                ...userData
+            });
+        });
+        
+        console.log(`👥 ${users.length} Benutzer aus Firebase geladen`);
+        return { success: true, users };
+    } catch (error) {
+        console.error('❌ Fehler beim Laden der Benutzer:', error);
+        return { success: false, error: error.message, users: [] };
+    }
+}
+
+// Benutzer synchronisieren - NEUE FUNKTION
+async function syncUsers() {
+    if (!firebaseInitialized || !auth || !db) {
+        throw new Error('Firebase nicht initialisiert');
+    }
+    
+    try {
+        console.log('🔄 Starte Benutzer-Synchronisation...');
+        
+        // Alle Firestore-Benutzer laden
+        const firestoreUsers = await loadAllUsers();
+        
+        if (firestoreUsers.success) {
+            // Lokale Benutzer-Liste aktualisieren
+            window.users = firestoreUsers.users;
+            window.users.forEach(user => {
+                console.log(`✅ Synchronisiert: ${user.name} (${user.email})`);
+            });
+            
+            return { success: true, count: firestoreUsers.users.length };
+        } else {
+            throw new Error(firestoreUsers.error);
+        }
+    } catch (error) {
+        console.error('❌ Benutzer-Synchronisation fehlgeschlagen:', error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -491,7 +538,10 @@ window.FirebaseClient = {
     batchUpdate: batchUpdate,
     upload: uploadFile,
     status: getConnectionStatus,
-    createUser: createUser
+    createUser: createUser,
+    deleteUser: deleteUser,
+    loadAllUsers: loadAllUsers,
+    syncUsers: syncUsers
 };
 
 // Automatische Initialisierung mit besserer Fehlerbehandlung

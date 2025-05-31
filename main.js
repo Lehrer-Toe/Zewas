@@ -927,76 +927,60 @@ async function lehrerHinzufuegen() {
         alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
         return;
     }
-    
-    const name = document.getElementById('lehrerName').value.trim();
-    const email = document.getElementById('lehrerEmail').value.trim();
+
+    const name     = document.getElementById('lehrerName').value.trim();
+    const email    = document.getElementById('lehrerEmail').value.trim();
     const password = document.getElementById('lehrerPasswort').value.trim();
-    
+
     if (!name || !email || !password) {
         alert('Bitte füllen Sie alle Felder aus!');
         return;
     }
-    
     if (users.find(u => u.email === email)) {
         alert('Ein Nutzer mit dieser E-Mail existiert bereits!');
         return;
     }
-    
-    // UI blockieren während des Speichervorgangs
-    const createButton = document.querySelector('button[onclick="lehrerHinzufuegen()"]');
-    const originalText = createButton.textContent;
-    createButton.disabled = true;
-    createButton.textContent = 'Erstelle Benutzer...';
-    
+
+    const btn        = document.querySelector('button[onclick="lehrerHinzufuegen()"]');
+    const btnTxtOrig = btn.textContent;
+    btn.disabled     = true;
+    btn.textContent  = 'Erstelle Benutzer…';
+
     try {
-        // Neuen Benutzer in Firebase Auth und Firestore erstellen
         const userData = {
             name,
             email,
-            role: 'lehrer',
+            role   : 'lehrer',
             created: new Date().toISOString()
         };
-        
+
         const result = await window.FirebaseClient.createUser(email, password, userData);
-        
+
         if (result.success) {
-            // Felder zurücksetzen
-            document.getElementById('lehrerName').value = '';
-            document.getElementById('lehrerEmail').value = '';
+            // neue lokale Daten
+            const neuerLehrer = { ...userData, id: result.uid };   // FIX: Spread-Syntax
+            users.push(neuerLehrer);
+
+            // UI
+            document.getElementById('lehrerName').value     = '';
+            document.getElementById('lehrerEmail').value    = '';
             document.getElementById('lehrerPasswort').value = 'lehrer123';
-            
-            if (result.requiresRelogin) {
-                // Der Admin muss sich wieder anmelden
-                alert(`Lehrer ${name} wurde erfolgreich erstellt. Sie werden zur Anmeldung weitergeleitet.`);
-                // Die Seite wird automatisch neu geladen
-                return;
-            } else {
-                // Lokalen Zustand aktualisieren (nur wenn kein Reload erforderlich)
-                const neuerLehrer = {
-                    ...userData,
-                    id: result.uid
-                };
-                
-                users.push(neuerLehrer);
-                
-                loadLehrer();
-                loadSchuelerLehrerAuswahl();
-                await addNews('Neuer Lehrer', `${name} wurde als Lehrer angelegt.`);
-            }
+            loadLehrer();
+            loadSchuelerLehrerAuswahl();
+
+            await addNews('Neuer Lehrer', `${name} wurde als Lehrer angelegt.`);
         } else {
-            throw new Error(result.error || 'Unbekannter Fehler beim Erstellen des Benutzers');
+            throw new Error(result.error || 'Unbekannter Fehler beim Erstellen');
         }
     } catch (error) {
         console.error('❌ Fehler beim Erstellen des Lehrers:', error);
         alert(`Fehler beim Erstellen: ${error.message}`);
     } finally {
-        // UI entsperren (nur wenn die Seite nicht neu geladen wird)
-        if (createButton.textContent === 'Erstelle Benutzer...') {
-            createButton.disabled = false;
-            createButton.textContent = originalText;
-        }
+        btn.disabled  = false;
+        btn.textContent = btnTxtOrig;
     }
 }
+
 
 function lehrerBearbeiten(lehrerId) {
     const lehrer = users.find(u => u.id === lehrerId);
@@ -1030,65 +1014,55 @@ function lehrerBearbeiten(lehrerId) {
     document.body.appendChild(modal);
 }
 
+// -----------------------------------------------------------
+// Lehrer bearbeiten / speichern
+// -----------------------------------------------------------
 async function lehrerSpeichern(lehrerId) {
     if (!window.firebaseInitialized) {
         alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
         return;
     }
-    
-    const name = document.getElementById('editLehrerName').value.trim();
+
+    const name     = document.getElementById('editLehrerName').value.trim();
     const password = document.getElementById('editLehrerPasswort').value.trim();
-    
     if (!name) {
         alert('Bitte geben Sie einen Namen ein!');
         return;
     }
-    
-    // UI blockieren während des Speichervorgangs
-    const saveButton = document.querySelector('.modal-buttons .btn-success');
-    const originalText = saveButton.textContent;
-    saveButton.disabled = true;
-    saveButton.textContent = 'Speichern...';
-    
+
+    const btn        = document.querySelector('.modal-buttons .btn-success');
+    const btnTxtOrig = btn.textContent;
+    btn.disabled     = true;
+    btn.textContent  = 'Speichern…';
+
     try {
-        const lehrerIndex = users.findIndex(u => u.id === lehrerId);
-        if (lehrerIndex === -1) {
-            throw new Error('Lehrer nicht gefunden');
-        }
-        
-        // Lehrer-Daten aktualisieren
+        const idx = users.findIndex(u => u.id === lehrerId);
+        if (idx === -1) throw new Error('Lehrer nicht gefunden');
+
         const aktualisierterLehrer = {
-            ...users[lehrerIndex],
+            ...users[idx],           // FIX: Spread-Syntax
             name,
             lastModified: new Date().toISOString()
         };
-        
-        // Daten in Firebase speichern
+
         const updateData = { name };
-        if (password) {
-            updateData.password = password; // Nur in der Firestore-Datenbank, nicht in Auth
-        }
-        
+        if (password) updateData.password = password;
+
         const result = await window.FirebaseClient.save('users', aktualisierterLehrer, lehrerId);
-        
-        if (result.success) {
-            // Lokalen Zustand aktualisieren
-            users[lehrerIndex] = aktualisierterLehrer;
-            
-            await addNews('Lehrer aktualisiert', `Daten von ${name} wurden geändert.`);
-            document.querySelector('.modal').remove();
-            loadLehrer();
-            loadSchuelerLehrerAuswahl();
-        } else {
-            throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
-        }
+        if (!result.success) throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+
+        users[idx] = aktualisierterLehrer;
+        await addNews('Lehrer aktualisiert', `Daten von ${name} wurden geändert.`);
+
+        document.querySelector('.modal').remove();
+        loadLehrer();
+        loadSchuelerLehrerAuswahl();
     } catch (error) {
         console.error('❌ Fehler beim Aktualisieren des Lehrers:', error);
         alert(`Fehler beim Speichern: ${error.message}`);
     } finally {
-        // UI entsperren
-        saveButton.disabled = false;
-        saveButton.textContent = originalText;
+        btn.disabled  = false;
+        btn.textContent = btnTxtOrig;
     }
 }
 

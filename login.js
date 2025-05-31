@@ -2,10 +2,13 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔐 Login-System wird initialisiert...');
     
-    document.getElementById('loginForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        loginUser();
-    });
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            loginUser();
+        });
+    }
     
     // Status-Updates für Login-Screen
     setupLoginStatusUpdates();
@@ -137,15 +140,17 @@ function waitForFirebase(timeoutMs) {
 
 function showError(message) {
     const errorDiv = document.getElementById('errorMessage');
-    errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
-    
-    // Fehler nach 8 Sekunden ausblenden
-    setTimeout(() => {
-        if (errorDiv.textContent === message) {
-            errorDiv.style.display = 'none';
-        }
-    }, 8000);
+    if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        // Fehler nach 8 Sekunden ausblenden
+        setTimeout(() => {
+            if (errorDiv.textContent === message) {
+                errorDiv.style.display = 'none';
+            }
+        }, 8000);
+    }
 }
 
 function showApp() {
@@ -156,7 +161,10 @@ function showApp() {
     document.getElementById('currentUser').textContent = `${currentUser.name} (${currentUser.role})`;
     
     // Fehlermeldung ausblenden
-    document.getElementById('errorMessage').style.display = 'none';
+    const errorMessage = document.getElementById('errorMessage');
+    if (errorMessage) {
+        errorMessage.style.display = 'none';
+    }
     
     // ALLE Tabs erst mal verstecken
     const allTabs = [
@@ -260,11 +268,11 @@ async function loadInitialData() {
         }
         
         // Lade Fächer falls noch nicht geladen
-        if (Object.keys(alleFaecherGlobal).length === 0) {
+        if (!alleFaecherGlobal || Object.keys(alleFaecherGlobal).length === 0) {
             const faecherResult = await window.FirebaseClient.load('faecher');
             if (faecherResult.success && faecherResult.data.length > 0) {
                 const faecher = faecherResult.data.find(f => f.id === 'standard-faecher');
-                if (faecher) {
+                if (faecher && faecher.D) { // Prüfe ob es echte Fächer-Daten sind
                     window.alleFaecherGlobal = faecher;
                     alleFaecherGlobal = faecher;
                     console.log('📚 Fächer geladen');
@@ -273,11 +281,11 @@ async function loadInitialData() {
         }
         
         // Lade Checkpoints falls noch nicht geladen
-        if (Object.keys(bewertungsCheckpoints).length === 0) {
+        if (!bewertungsCheckpoints || Object.keys(bewertungsCheckpoints).length === 0) {
             const checkpointsResult = await window.FirebaseClient.load('checkpoints');
             if (checkpointsResult.success && checkpointsResult.data.length > 0) {
                 const checkpoints = checkpointsResult.data.find(c => c.id === 'bewertungs-checkpoints');
-                if (checkpoints) {
+                if (checkpoints && checkpoints['Fachliches Arbeiten']) { // Prüfe ob es echte Checkpoint-Daten sind
                     window.bewertungsCheckpoints = checkpoints;
                     bewertungsCheckpoints = checkpoints;
                     console.log('✅ Bewertungs-Checkpoints geladen');
@@ -286,11 +294,11 @@ async function loadInitialData() {
         }
         
         // Lade Briefvorlagen falls noch nicht geladen
-        if (!briefvorlage.anrede || !briefvorlage.schluss) {
+        if (!briefvorlage || !briefvorlage.anrede) {
             const briefvorlagenResult = await window.FirebaseClient.load('briefvorlagen');
             if (briefvorlagenResult.success && briefvorlagenResult.data.length > 0) {
                 const vorlage = briefvorlagenResult.data.find(v => v.id === 'standard-vorlage');
-                if (vorlage) {
+                if (vorlage && vorlage.anrede) {
                     window.briefvorlage = vorlage;
                     briefvorlage = vorlage;
                     console.log('📝 Briefvorlage geladen');
@@ -308,7 +316,7 @@ async function loadInitialData() {
         // Lade alle anderen Daten
         const dataToLoad = {
             'users': 'users',
-            'themen': 'themen',
+            'themen': 'themen', 
             'gruppen': 'gruppen',
             'bewertungen': 'bewertungen',
             'news': 'news',
@@ -321,7 +329,27 @@ async function loadInitialData() {
                 window[globalVar] = result.data;
                 // Auch die lokalen Variablen aktualisieren
                 if (typeof window[globalVar] !== 'undefined') {
-                    eval(`${globalVar} = window.${globalVar}`);
+                    // Dynamische Zuweisung für lokale Variablen
+                    switch(globalVar) {
+                        case 'users':
+                            users = window[globalVar];
+                            break;
+                        case 'themen':
+                            themen = window[globalVar];
+                            break;
+                        case 'gruppen':
+                            gruppen = window[globalVar];
+                            break;
+                        case 'bewertungen':
+                            bewertungen = window[globalVar];
+                            break;
+                        case 'news':
+                            news = window[globalVar];
+                            break;
+                        case 'vorlagen':
+                            vorlagen = window[globalVar];
+                            break;
+                    }
                 }
                 console.log(`✅ ${collection} geladen (${result.data.length} Einträge)`);
             } else {
@@ -398,12 +426,23 @@ async function logout() {
         window.news = [];
         window.vorlagen = {};
         
+        // Lokale Variablen auch zurücksetzen
+        users = [];
+        themen = [];
+        gruppen = [];
+        bewertungen = [];
+        news = [];
+        vorlagen = {};
+        
         // Login-Screen anzeigen
         document.getElementById('loginScreen').style.display = 'flex';
         document.getElementById('appContainer').style.display = 'none';
         document.getElementById('email').value = '';
         document.getElementById('password').value = '';
-        document.getElementById('errorMessage').style.display = 'none';
+        const errorMessage = document.getElementById('errorMessage');
+        if (errorMessage) {
+            errorMessage.style.display = 'none';
+        }
         
         // Status zurücksetzen
         setupLoginStatusUpdates();

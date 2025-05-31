@@ -49,12 +49,17 @@ function setupLoginStatusUpdates() {
         checkFirebaseStatus();
     }, 1000);
     
-    // Stop interval wenn Firebase bereit ist
-    setTimeout(() => {
-        if (window.firebaseInitialized) {
-            clearInterval(statusInterval);
-        }
-    }, 10000);
+    // Sichere Tab-Inhalte Ladung
+setTimeout(() => {
+    try {
+        loadTabInhalte();
+    } catch (error) {
+        console.warn('⚠️ Einige Tab-Inhalte konnten nicht geladen werden:', error);
+        // Lade zumindest die kritischen Funktionen
+        if (typeof loadNews === 'function') loadNews();
+        if (typeof loadThemen === 'function') loadThemen();
+    }
+}, 500);
 }
 
 async function loginUser() {

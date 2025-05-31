@@ -426,22 +426,57 @@ async function createUser(email, password, userData) {
         throw new Error('Firebase nicht initialisiert');
     }
     
+    // Aktuellen Admin-Benutzer merken
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+        throw new Error('Kein Administrator angemeldet');
+    }
+    
     try {
         // Benutzer in Firebase Auth erstellen
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
+        const newUser = userCredential.user;
         
-        // Benutzerdaten in Firestore speichern
-        await db.collection('users').doc(user.uid).set({
+        // Benutzerdaten in Firestore speichern (während der neue Benutzer angemeldet ist)
+        await db.collection('users').doc(newUser.uid).set({
             ...userData,
             email: email,
             created: firebase.firestore.FieldValue.serverTimestamp()
         });
         
+        // Den neuen Benutzer abmelden
+        await auth.signOut();
+        
+        // Den ursprünglichen Admin wieder anmelden
+        // Dafür müssen wir das Admin-Passwort haben oder einen anderen Weg finden
+        // Alternativ: Seite neu laden, damit der Admin sich wieder anmelden muss
+        
         console.log(`✅ Benutzer ${email} erstellt`);
-        return { success: true, uid: user.uid };
+        console.log('ℹ️ Bitte melden Sie sich als Administrator wieder an');
+        
+        // Hinweis für den Benutzer anzeigen
+        setTimeout(() => {
+            alert('Benutzer wurde erfolgreich erstellt. Sie werden zur Anmeldung weitergeleitet.');
+            window.location.reload();
+        }, 1000);
+        
+        return { success: true, uid: newUser.uid, requiresRelogin: true };
     } catch (error) {
         console.error('❌ Benutzer konnte nicht erstellt werden:', error);
+        
+        // Falls ein Fehler auftritt, versuche den ursprünglichen Benutzer wieder anzumelden
+        try {
+            if (currentUser && auth.currentUser?.uid !== currentUser.uid) {
+                await auth.signOut();
+                // Seite neu laden, damit sich der Admin wieder anmelden kann
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        } catch (reloginError) {
+            console.error('❌ Fehler beim Wiederherstellen der Admin-Anmeldung:', reloginError);
+        }
+        
         return { success: false, error: translateFirebaseError(error) };
     }
 }

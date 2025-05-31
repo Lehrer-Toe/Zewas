@@ -446,6 +446,12 @@ function loadStaerkenFormulierungen() {
         return;
     }
     
+    // Prüfe ob bewertungsCheckpoints existiert und ein Object ist
+    if (!bewertungsCheckpoints || typeof bewertungsCheckpoints !== 'object') {
+        container.innerHTML = '<div class="card"><p>Bewertungs-Checkpoints werden geladen...</p></div>';
+        return;
+    }
+    
     const icons = {
         'Fachliches Arbeiten': '🧠',
         'Zusammenarbeit': '🤝',
@@ -456,30 +462,44 @@ function loadStaerkenFormulierungen() {
     };
     
     let html = '';
-    Object.keys(bewertungsCheckpoints).forEach(kategorie => {
-        html += `
-            <div class="staerken-formulierung">
-                <h4>${icons[kategorie]} ${kategorie}</h4>
-        `;
-        
-        bewertungsCheckpoints[kategorie].forEach((text, index) => {
-            const key = `${kategorie}_${index}`;
-            const formulierung = staerkenFormulierungen[key] || text;
+    
+    try {
+        Object.keys(bewertungsCheckpoints).forEach(kategorie => {
+            const checkpoints = bewertungsCheckpoints[kategorie];
+            
+            // Sicherheitsprüfung: Stelle sicher, dass checkpoints ein Array ist
+            if (!Array.isArray(checkpoints)) {
+                console.warn(`⚠️ Checkpoints für ${kategorie} ist kein Array:`, checkpoints);
+                return;
+            }
             
             html += `
-                <div class="formulierung-item">
-                    <label>${text}:</label>
-                    <input type="text" value="${formulierung}" 
-                           onchange="updateStaerkenFormulierung('${key}', this.value)"
-                           placeholder="Formulierung für PDF-Brief">
-                </div>
+                <div class="staerken-formulierung">
+                    <h4>${icons[kategorie] || '📋'} ${kategorie}</h4>
             `;
+            
+            checkpoints.forEach((text, index) => {
+                const key = `${kategorie}_${index}`;
+                const formulierung = staerkenFormulierungen[key] || text;
+                
+                html += `
+                    <div class="formulierung-item">
+                        <label>${text}:</label>
+                        <input type="text" value="${formulierung}" 
+                               onchange="updateStaerkenFormulierung('${key}', this.value)"
+                               placeholder="Formulierung für PDF-Brief">
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
         });
-        
-        html += '</div>';
-    });
+    } catch (error) {
+        console.error('❌ Fehler beim Laden der Stärken-Formulierungen:', error);
+        html = '<div class="card"><p>Fehler beim Laden der Formulierungen. Bitte laden Sie die Seite neu.</p></div>';
+    }
     
-    container.innerHTML = html;
+    container.innerHTML = html || '<div class="card"><p>Keine Formulierungen verfügbar.</p></div>';
 }
 
 function loadBriefvorlageEditor() {
@@ -488,8 +508,11 @@ function loadBriefvorlageEditor() {
         return;
     }
     
-    document.getElementById('briefAnrede').value = briefvorlage.anrede || '';
-    document.getElementById('briefSchluss').value = briefvorlage.schluss || '';
+    const anredeInput = document.getElementById('briefAnrede');
+    const schlussInput = document.getElementById('briefSchluss');
+    
+    if (anredeInput) anredeInput.value = briefvorlage.anrede || '';
+    if (schlussInput) schlussInput.value = briefvorlage.schluss || '';
 }
 
 function updateStaerkenFormulierung(key, value) {
@@ -580,33 +603,50 @@ function loadCheckpointsVerwaltung() {
         return;
     }
     
+    // Prüfe ob bewertungsCheckpoints existiert und ein Object ist
+    if (!bewertungsCheckpoints || typeof bewertungsCheckpoints !== 'object') {
+        container.innerHTML = '<h3>Bewertungs-Checkpoints verwalten</h3><div class="card"><p>Bewertungs-Checkpoints werden geladen...</p></div>';
+        return;
+    }
+    
     let html = '<h3>Bewertungs-Checkpoints verwalten</h3>';
     
-    Object.entries(bewertungsCheckpoints).forEach(([kategorie, checkpoints]) => {
-        html += `
-            <div class="checkpoint-kategorie">
-                <h4>${kategorie}</h4>
-                <div class="checkpoints-liste">
-        `;
-        
-        checkpoints.forEach((checkpoint, index) => {
+    try {
+        Object.entries(bewertungsCheckpoints).forEach(([kategorie, checkpoints]) => {
+            // Sicherheitsprüfung: Stelle sicher, dass checkpoints ein Array ist
+            if (!Array.isArray(checkpoints)) {
+                console.warn(`⚠️ Checkpoints für ${kategorie} ist kein Array:`, checkpoints);
+                return;
+            }
+            
             html += `
-                <div class="checkpoint-item">
-                    <input type="text" value="${checkpoint}" 
-                           onchange="updateCheckpoint('${kategorie}', ${index}, this.value)">
-                    <button class="btn btn-danger btn-sm" 
-                            onclick="checkpointLoeschen('${kategorie}', ${index})">Löschen</button>
+                <div class="checkpoint-kategorie">
+                    <h4>${kategorie}</h4>
+                    <div class="checkpoints-liste">
+            `;
+            
+            checkpoints.forEach((checkpoint, index) => {
+                html += `
+                    <div class="checkpoint-item">
+                        <input type="text" value="${checkpoint}" 
+                               onchange="updateCheckpoint('${kategorie}', ${index}, this.value)">
+                        <button class="btn btn-danger btn-sm" 
+                                onclick="checkpointLoeschen('${kategorie}', ${index})">Löschen</button>
+                    </div>
+                `;
+            });
+            
+            html += `
+                        <button class="btn btn-success btn-sm" 
+                                onclick="neuerCheckpoint('${kategorie}')">Checkpoint hinzufügen</button>
+                    </div>
                 </div>
             `;
         });
-        
-        html += `
-                    <button class="btn btn-success btn-sm" 
-                            onclick="neuerCheckpoint('${kategorie}')">Checkpoint hinzufügen</button>
-                </div>
-            </div>
-        `;
-    });
+    } catch (error) {
+        console.error('❌ Fehler beim Laden der Checkpoints-Verwaltung:', error);
+        html += '<div class="card"><p>Fehler beim Laden der Checkpoints. Bitte laden Sie die Seite neu.</p></div>';
+    }
     
     container.innerHTML = html;
 }
@@ -619,25 +659,27 @@ async function updateCheckpoint(kategorie, index, neuerText) {
     
     try {
         // Lokalen Zustand aktualisieren
-        bewertungsCheckpoints[kategorie][index] = neuerText;
-        window.bewertungsCheckpoints[kategorie][index] = neuerText;
-        
-        // Auch Stärkenformulierungen aktualisieren
-        const key = `${kategorie}_${index}`;
-        if (staerkenFormulierungen[key]) {
-            staerkenFormulierungen[key] = neuerText;
-            window.staerkenFormulierungen[key] = neuerText;
-        }
-        
-        // Firebase speichern
-        const checkpointsResult = await window.FirebaseClient.save('checkpoints', window.bewertungsCheckpoints, 'bewertungs-checkpoints');
-        
-        if (staerkenFormulierungen[key]) {
-            await window.FirebaseClient.save('briefvorlagen', window.staerkenFormulierungen, 'staerken-formulierungen');
-        }
-        
-        if (!checkpointsResult.success) {
-            throw new Error(checkpointsResult.error || 'Unbekannter Fehler beim Speichern');
+        if (bewertungsCheckpoints[kategorie] && Array.isArray(bewertungsCheckpoints[kategorie])) {
+            bewertungsCheckpoints[kategorie][index] = neuerText;
+            window.bewertungsCheckpoints[kategorie][index] = neuerText;
+            
+            // Auch Stärkenformulierungen aktualisieren
+            const key = `${kategorie}_${index}`;
+            if (staerkenFormulierungen[key]) {
+                staerkenFormulierungen[key] = neuerText;
+                window.staerkenFormulierungen[key] = neuerText;
+            }
+            
+            // Firebase speichern
+            const checkpointsResult = await window.FirebaseClient.save('checkpoints', window.bewertungsCheckpoints, 'bewertungs-checkpoints');
+            
+            if (staerkenFormulierungen[key]) {
+                await window.FirebaseClient.save('briefvorlagen', window.staerkenFormulierungen, 'staerken-formulierungen');
+            }
+            
+            if (!checkpointsResult.success) {
+                throw new Error(checkpointsResult.error || 'Unbekannter Fehler beim Speichern');
+            }
         }
     } catch (error) {
         console.error('❌ Fehler beim Aktualisieren des Checkpoints:', error);
@@ -654,41 +696,43 @@ async function checkpointLoeschen(kategorie, index) {
     if (confirm('Checkpoint wirklich löschen?')) {
         try {
             // Lokalen Zustand aktualisieren
-            bewertungsCheckpoints[kategorie].splice(index, 1);
-            window.bewertungsCheckpoints[kategorie].splice(index, 1);
-            
-            // Firebase speichern
-            const result = await window.FirebaseClient.save('checkpoints', window.bewertungsCheckpoints, 'bewertungs-checkpoints');
-            
-            if (result.success) {
-                // Auch die Stärkenformulierungen anpassen
-                // Schlüssel neu zuordnen (alle nachfolgenden Indizes verschieben)
-                const updatedFormulierungen = {};
-                Object.keys(staerkenFormulierungen).forEach(key => {
-                    const [kat, idx] = key.split('_');
-                    const numIdx = parseInt(idx);
-                    
-                    if (kat === kategorie) {
-                        if (numIdx < index) {
+            if (bewertungsCheckpoints[kategorie] && Array.isArray(bewertungsCheckpoints[kategorie])) {
+                bewertungsCheckpoints[kategorie].splice(index, 1);
+                window.bewertungsCheckpoints[kategorie].splice(index, 1);
+                
+                // Firebase speichern
+                const result = await window.FirebaseClient.save('checkpoints', window.bewertungsCheckpoints, 'bewertungs-checkpoints');
+                
+                if (result.success) {
+                    // Auch die Stärkenformulierungen anpassen
+                    // Schlüssel neu zuordnen (alle nachfolgenden Indizes verschieben)
+                    const updatedFormulierungen = {};
+                    Object.keys(staerkenFormulierungen).forEach(key => {
+                        const [kat, idx] = key.split('_');
+                        const numIdx = parseInt(idx);
+                        
+                        if (kat === kategorie) {
+                            if (numIdx < index) {
+                                updatedFormulierungen[key] = staerkenFormulierungen[key];
+                            } else if (numIdx > index) {
+                                updatedFormulierungen[`${kat}_${numIdx-1}`] = staerkenFormulierungen[key];
+                            }
+                            // Der gelöschte Index wird nicht übernommen
+                        } else {
                             updatedFormulierungen[key] = staerkenFormulierungen[key];
-                        } else if (numIdx > index) {
-                            updatedFormulierungen[`${kat}_${numIdx-1}`] = staerkenFormulierungen[key];
                         }
-                        // Der gelöschte Index wird nicht übernommen
-                    } else {
-                        updatedFormulierungen[key] = staerkenFormulierungen[key];
-                    }
-                });
-                
-                // Staerkenformulierungen aktualisieren
-                window.staerkenFormulierungen = updatedFormulierungen;
-                staerkenFormulierungen = updatedFormulierungen;
-                
-                await window.FirebaseClient.save('briefvorlagen', window.staerkenFormulierungen, 'staerken-formulierungen');
-                
-                loadCheckpointsVerwaltung();
-            } else {
-                throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+                    });
+                    
+                    // Staerkenformulierungen aktualisieren
+                    window.staerkenFormulierungen = updatedFormulierungen;
+                    staerkenFormulierungen = updatedFormulierungen;
+                    
+                    await window.FirebaseClient.save('briefvorlagen', window.staerkenFormulierungen, 'staerken-formulierungen');
+                    
+                    loadCheckpointsVerwaltung();
+                } else {
+                    throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+                }
             }
         } catch (error) {
             console.error('❌ Fehler beim Löschen des Checkpoints:', error);
@@ -707,23 +751,25 @@ async function neuerCheckpoint(kategorie) {
     if (text && text.trim()) {
         try {
             // Lokalen Zustand aktualisieren
-            bewertungsCheckpoints[kategorie].push(text.trim());
-            window.bewertungsCheckpoints[kategorie].push(text.trim());
-            
-            // Stärkenformulierung hinzufügen
-            const index = bewertungsCheckpoints[kategorie].length - 1;
-            const key = `${kategorie}_${index}`;
-            staerkenFormulierungen[key] = text.trim();
-            window.staerkenFormulierungen[key] = text.trim();
-            
-            // Firebase speichern
-            const checkpointsResult = await window.FirebaseClient.save('checkpoints', window.bewertungsCheckpoints, 'bewertungs-checkpoints');
-            const formulierungenResult = await window.FirebaseClient.save('briefvorlagen', window.staerkenFormulierungen, 'staerken-formulierungen');
-            
-            if (checkpointsResult.success && formulierungenResult.success) {
-                loadCheckpointsVerwaltung();
-            } else {
-                throw new Error((checkpointsResult.error || formulierungenResult.error) || 'Unbekannter Fehler beim Speichern');
+            if (bewertungsCheckpoints[kategorie] && Array.isArray(bewertungsCheckpoints[kategorie])) {
+                bewertungsCheckpoints[kategorie].push(text.trim());
+                window.bewertungsCheckpoints[kategorie].push(text.trim());
+                
+                // Stärkenformulierung hinzufügen
+                const index = bewertungsCheckpoints[kategorie].length - 1;
+                const key = `${kategorie}_${index}`;
+                staerkenFormulierungen[key] = text.trim();
+                window.staerkenFormulierungen[key] = text.trim();
+                
+                // Firebase speichern
+                const checkpointsResult = await window.FirebaseClient.save('checkpoints', window.bewertungsCheckpoints, 'bewertungs-checkpoints');
+                const formulierungenResult = await window.FirebaseClient.save('briefvorlagen', window.staerkenFormulierungen, 'staerken-formulierungen');
+                
+                if (checkpointsResult.success && formulierungenResult.success) {
+                    loadCheckpointsVerwaltung();
+                } else {
+                    throw new Error((checkpointsResult.error || formulierungenResult.error) || 'Unbekannter Fehler beim Speichern');
+                }
             }
         } catch (error) {
             console.error('❌ Fehler beim Hinzufügen des Checkpoints:', error);
@@ -744,26 +790,37 @@ function loadFaecherVerwaltung() {
         return;
     }
     
+    // Prüfe ob alleFaecherGlobal existiert und ein Object ist
+    if (!alleFaecherGlobal || typeof alleFaecherGlobal !== 'object') {
+        container.innerHTML = '<h3>Fächer verwalten</h3><div class="card"><p>Fächer werden geladen...</p></div>';
+        return;
+    }
+    
     let html = '<h3>Fächer verwalten</h3>';
     
-    Object.entries(alleFaecherGlobal).forEach(([kuerzel, name]) => {
+    try {
+        Object.entries(alleFaecherGlobal).forEach(([kuerzel, name]) => {
+            html += `
+                <div class="fach-item">
+                    <input type="text" value="${name}" id="fach-${kuerzel}" onchange="updateFachName('${kuerzel}', this.value)">
+                    <span class="fach-kuerzel">(${kuerzel})</span>
+                    <button class="btn btn-danger btn-sm" onclick="fachLoeschen('${kuerzel}')">Löschen</button>
+                </div>
+            `;
+        });
+        
         html += `
-            <div class="fach-item">
-                <input type="text" value="${name}" id="fach-${kuerzel}" onchange="updateFachName('${kuerzel}', this.value)">
-                <span class="fach-kuerzel">(${kuerzel})</span>
-                <button class="btn btn-danger btn-sm" onclick="fachLoeschen('${kuerzel}')">Löschen</button>
+            <div class="neues-fach">
+                <h4>Neues Fach hinzufügen</h4>
+                <input type="text" id="neuesFachKuerzel" placeholder="Kürzel (z.B. CHE)" maxlength="4">
+                <input type="text" id="neuesFachName" placeholder="Fachname (z.B. Chemie)">
+                <button class="btn btn-success" onclick="neuesFachHinzufuegen()">Hinzufügen</button>
             </div>
         `;
-    });
-    
-    html += `
-        <div class="neues-fach">
-            <h4>Neues Fach hinzufügen</h4>
-            <input type="text" id="neuesFachKuerzel" placeholder="Kürzel (z.B. CHE)" maxlength="4">
-            <input type="text" id="neuesFachName" placeholder="Fachname (z.B. Chemie)">
-            <button class="btn btn-success" onclick="neuesFachHinzufuegen()">Hinzufügen</button>
-        </div>
-    `;
+    } catch (error) {
+        console.error('❌ Fehler beim Laden der Fächer-Verwaltung:', error);
+        html += '<div class="card"><p>Fehler beim Laden der Fächer. Bitte laden Sie die Seite neu.</p></div>';
+    }
     
     container.innerHTML = html;
 }
@@ -927,60 +984,67 @@ async function lehrerHinzufuegen() {
         alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
         return;
     }
-
-    const name     = document.getElementById('lehrerName').value.trim();
-    const email    = document.getElementById('lehrerEmail').value.trim();
+    
+    const name = document.getElementById('lehrerName').value.trim();
+    const email = document.getElementById('lehrerEmail').value.trim();
     const password = document.getElementById('lehrerPasswort').value.trim();
-
+    
     if (!name || !email || !password) {
         alert('Bitte füllen Sie alle Felder aus!');
         return;
     }
+    
     if (users.find(u => u.email === email)) {
         alert('Ein Nutzer mit dieser E-Mail existiert bereits!');
         return;
     }
-
-    const btn        = document.querySelector('button[onclick="lehrerHinzufuegen()"]');
-    const btnTxtOrig = btn.textContent;
-    btn.disabled     = true;
-    btn.textContent  = 'Erstelle Benutzer…';
-
+    
+    // UI blockieren während des Speichervorgangs
+    const createButton = document.querySelector('button[onclick="lehrerHinzufuegen()"]');
+    const originalText = createButton.textContent;
+    createButton.disabled = true;
+    createButton.textContent = 'Erstelle Benutzer...';
+    
     try {
+        // Neuen Benutzer in Firebase Auth und Firestore erstellen
         const userData = {
             name,
             email,
-            role   : 'lehrer',
+            role: 'lehrer',
             created: new Date().toISOString()
         };
-
+        
         const result = await window.FirebaseClient.createUser(email, password, userData);
-
+        
         if (result.success) {
-            // neue lokale Daten
-            const neuerLehrer = { ...userData, id: result.uid };   // FIX: Spread-Syntax
+            // Lokalen Zustand aktualisieren
+            const neuerLehrer = {
+                ...userData,
+                id: result.uid
+            };
+            
             users.push(neuerLehrer);
-
-            // UI
-            document.getElementById('lehrerName').value     = '';
-            document.getElementById('lehrerEmail').value    = '';
+            
+            // Felder zurücksetzen
+            document.getElementById('lehrerName').value = '';
+            document.getElementById('lehrerEmail').value = '';
             document.getElementById('lehrerPasswort').value = 'lehrer123';
+            
             loadLehrer();
             loadSchuelerLehrerAuswahl();
-
             await addNews('Neuer Lehrer', `${name} wurde als Lehrer angelegt.`);
         } else {
-            throw new Error(result.error || 'Unbekannter Fehler beim Erstellen');
+            throw new Error(result.error || 'Unbekannter Fehler beim Erstellen des Benutzers');
         }
     } catch (error) {
         console.error('❌ Fehler beim Erstellen des Lehrers:', error);
         alert(`Fehler beim Erstellen: ${error.message}`);
     } finally {
-        btn.disabled  = false;
-        btn.textContent = btnTxtOrig;
+        // UI entsperren
+        createButton.disabled = false;
+        createButton.textContent = originalText;
     }
 }
-
 
 function lehrerBearbeiten(lehrerId) {
     const lehrer = users.find(u => u.id === lehrerId);
@@ -1014,55 +1078,65 @@ function lehrerBearbeiten(lehrerId) {
     document.body.appendChild(modal);
 }
 
-// -----------------------------------------------------------
-// Lehrer bearbeiten / speichern
-// -----------------------------------------------------------
 async function lehrerSpeichern(lehrerId) {
     if (!window.firebaseInitialized) {
         alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
         return;
     }
-
-    const name     = document.getElementById('editLehrerName').value.trim();
+    
+    const name = document.getElementById('editLehrerName').value.trim();
     const password = document.getElementById('editLehrerPasswort').value.trim();
+    
     if (!name) {
         alert('Bitte geben Sie einen Namen ein!');
         return;
     }
-
-    const btn        = document.querySelector('.modal-buttons .btn-success');
-    const btnTxtOrig = btn.textContent;
-    btn.disabled     = true;
-    btn.textContent  = 'Speichern…';
-
+    
+    // UI blockieren während des Speichervorgangs
+    const saveButton = document.querySelector('.modal-buttons .btn-success');
+    const originalText = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Speichern...';
+    
     try {
-        const idx = users.findIndex(u => u.id === lehrerId);
-        if (idx === -1) throw new Error('Lehrer nicht gefunden');
-
+        const lehrerIndex = users.findIndex(u => u.id === lehrerId);
+        if (lehrerIndex === -1) {
+            throw new Error('Lehrer nicht gefunden');
+        }
+        
+        // Lehrer-Daten aktualisieren
         const aktualisierterLehrer = {
-            ...users[idx],           // FIX: Spread-Syntax
+            ...users[lehrerIndex],
             name,
             lastModified: new Date().toISOString()
         };
-
+        
+        // Daten in Firebase speichern
         const updateData = { name };
-        if (password) updateData.password = password;
-
+        if (password) {
+            updateData.password = password; // Nur in der Firestore-Datenbank, nicht in Auth
+        }
+        
         const result = await window.FirebaseClient.save('users', aktualisierterLehrer, lehrerId);
-        if (!result.success) throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
-
-        users[idx] = aktualisierterLehrer;
-        await addNews('Lehrer aktualisiert', `Daten von ${name} wurden geändert.`);
-
-        document.querySelector('.modal').remove();
-        loadLehrer();
-        loadSchuelerLehrerAuswahl();
+        
+        if (result.success) {
+            // Lokalen Zustand aktualisieren
+            users[lehrerIndex] = aktualisierterLehrer;
+            
+            await addNews('Lehrer aktualisiert', `Daten von ${name} wurden geändert.`);
+            document.querySelector('.modal').remove();
+            loadLehrer();
+            loadSchuelerLehrerAuswahl();
+        } else {
+            throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+        }
     } catch (error) {
         console.error('❌ Fehler beim Aktualisieren des Lehrers:', error);
         alert(`Fehler beim Speichern: ${error.message}`);
     } finally {
-        btn.disabled  = false;
-        btn.textContent = btnTxtOrig;
+        // UI entsperren
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
     }
 }
 
@@ -1538,99 +1612,11 @@ function loadSchuelerLehrerAuswahl() {
     fachSelects.forEach(select => {
         select.innerHTML = '<option value="">Fach wählen...</option>' + fachOptions;
     });
-}
-
-// App-Initialisierung - ONLINE-ONLY MODUS
-function initializeApp() {
-    console.log('🚀 Initialisiere App im Online-Modus...');
     
-    try {
-        // Warte auf Firebase - App startet erst, wenn Firebase bereit ist
-        if (window.firebaseInitialized) {
-            console.log('🔥 Firebase bereits initialisiert - bereit für Login');
-            // KEINE automatische Datenladung - nur bei Login
-        } else {
-            console.log('⏳ Warte auf Firebase-Initialisierung...');
-            // Event-Listener für Firebase
-            window.addEventListener('firebaseReady', () => {
-                console.log('🔥 Firebase ready - bereit für Login');
-                // KEINE automatische Datenladung - nur bei Login
-            });
-            
-            // Timeout für Firebase-Initialisierung
-            setTimeout(() => {
-                if (!window.firebaseInitialized) {
-                    console.error('❌ Firebase konnte nicht initialisiert werden');
-                    showFirebaseError('Firebase konnte nicht initialisiert werden. Bitte überprüfen Sie Ihre Internetverbindung und laden Sie die Seite neu.');
-                }
-            }, 10000); // 10 Sekunden Timeout
-        }
-    } catch (error) {
-        console.error('❌ Fehler bei App-Initialisierung:', error);
-        showFirebaseError('Ein Fehler ist aufgetreten. Bitte laden Sie die Seite neu.');
-    }
-}
-
-// Firebase-Fehler anzeigen
-function showFirebaseError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.9);
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-        font-size: 1.2rem;
-        text-align: center;
-        padding: 20px;
-    `;
-    
-    errorDiv.innerHTML = `
-        <div>
-            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
-            <div style="max-width: 600px;">
-                <h2>Verbindungsfehler</h2>
-                <p>${message}</p>
-                <button onclick="location.reload()" style="
-                    margin-top: 20px;
-                    padding: 10px 30px;
-                    font-size: 1rem;
-                    background: #e74c3c;
-                    color: white;
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                ">Seite neu laden</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(errorDiv);
-}
-
-// Initialisiere Inhalte für alle Tabs - wird nach Login aufgerufen
-function loadTabInhalte() {
-    loadNews();
-    loadThemen();
-    
-    // Tab-spezifische Inhalte nur laden, wenn Tab aktiv ist
-    const activeTab = document.querySelector('.tab-content.active');
-    if (activeTab) {
-        const tabId = activeTab.id;
-        
-        if (tabId === 'gruppen') loadGruppen();
-        if (tabId === 'lehrer') loadLehrer();
-        if (tabId === 'daten') loadDatenverwaltung();
-        if (tabId === 'bewerten') loadBewertungen();
-        if (tabId === 'vorlagen') loadVorlagen();
-        if (tabId === 'uebersicht') loadUebersicht();
-        if (tabId === 'adminvorlagen') loadAdminVorlagen();
+    // Themen-Filter auch laden
+    const themenFachFilter = document.getElementById('themenFachFilter');
+    if (themenFachFilter) {
+        themenFachFilter.innerHTML = '<option value="">Alle Fächer</option>' + fachOptions;
     }
 }
 

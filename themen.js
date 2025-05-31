@@ -1,12 +1,24 @@
 // Themen-System mit verbesserter Fächer-Auswahl
 function loadThemen() {
     const liste = document.getElementById('themenListe');
-    const filter = document.getElementById('themenFachFilter').value;
+    if (!liste) return;
+    
+    const filter = document.getElementById('themenFachFilter')?.value || '';
+    
+    if (!window.firebaseInitialized) {
+        liste.innerHTML = '<div class="card"><p>Warte auf Firebase-Verbindung...</p></div>';
+        return;
+    }
     
     // Themen nach Fach filtern
     let gefilterte = themen;
     if (filter) {
         gefilterte = themen.filter(t => t.faecher && t.faecher.includes(filter));
+    }
+    
+    if (gefilterte.length === 0) {
+        liste.innerHTML = '<div class="card"><p>Keine Themen vorhanden.</p></div>';
+        return;
     }
     
     let html = '';
@@ -34,52 +46,64 @@ function loadThemen() {
                 ''}
         </div>`;
     });
-    liste.innerHTML = html || '<div class="card"><p>Keine Themen vorhanden.</p></div>';
+    liste.innerHTML = html;
 }
 
 function getFachName(fachKuerzel) {
-    const faecher = {
-        'D': 'Deutsch',
-        'M': 'Mathematik',
-        'E': 'Englisch',
-        'FR': 'Französisch',
-        'T': 'Technik',
-        'AES': 'AES',
-        'G': 'Geschichte',
-        'GK': 'Gemeinschaftskunde',
-        'BIO': 'Biologie',
-        'PH': 'Physik',
-        'SP': 'Sport',
-        'BK': 'Bildende Kunst',
-        'IT': 'Informatik',
-        'WBS': 'WBS',
-        'REL': 'Religion',
-        'ETH': 'Ethik',
-        'ALL': 'Allgemein'
-    };
-    return faecher[fachKuerzel] || fachKuerzel;
+    // Prüfe ob alleFaecherGlobal verfügbar ist
+    if (!alleFaecherGlobal || typeof alleFaecherGlobal !== 'object') {
+        // Fallback zu Standard-Fächern
+        const standardFaecher = {
+            'D': 'Deutsch',
+            'M': 'Mathematik',
+            'E': 'Englisch',
+            'FR': 'Französisch',
+            'T': 'Technik',
+            'AES': 'AES',
+            'G': 'Geschichte',
+            'GK': 'Gemeinschaftskunde',
+            'BIO': 'Biologie',
+            'PH': 'Physik',
+            'SP': 'Sport',
+            'BK': 'Bildende Kunst',
+            'IT': 'Informatik',
+            'WBS': 'WBS',
+            'REL': 'Religion',
+            'ETH': 'Ethik',
+            'ALL': 'Allgemein'
+        };
+        return standardFaecher[fachKuerzel] || fachKuerzel;
+    }
+    
+    return alleFaecherGlobal[fachKuerzel] || fachKuerzel;
 }
 
 function getAllFaecher() {
-    return {
-        'D': 'Deutsch',
-        'M': 'Mathematik',
-        'E': 'Englisch',
-        'FR': 'Französisch',
-        'T': 'Technik',
-        'AES': 'AES',
-        'G': 'Geschichte',
-        'GK': 'Gemeinschaftskunde',
-        'BIO': 'Biologie',
-        'PH': 'Physik',
-        'SP': 'Sport',
-        'BK': 'Bildende Kunst',
-        'IT': 'Informatik',
-        'WBS': 'WBS',
-        'REL': 'Religion',
-        'ETH': 'Ethik',
-        'ALL': 'Allgemein'
-    };
+    // Prüfe ob alleFaecherGlobal verfügbar ist
+    if (!alleFaecherGlobal || typeof alleFaecherGlobal !== 'object') {
+        // Fallback zu Standard-Fächern
+        return {
+            'D': 'Deutsch',
+            'M': 'Mathematik',
+            'E': 'Englisch',
+            'FR': 'Französisch',
+            'T': 'Technik',
+            'AES': 'AES',
+            'G': 'Geschichte',
+            'GK': 'Gemeinschaftskunde',
+            'BIO': 'Biologie',
+            'PH': 'Physik',
+            'SP': 'Sport',
+            'BK': 'Bildende Kunst',
+            'IT': 'Informatik',
+            'WBS': 'WBS',
+            'REL': 'Religion',
+            'ETH': 'Ethik',
+            'ALL': 'Allgemein'
+        };
+    }
+    
+    return alleFaecherGlobal;
 }
 
 function filterThemen() {
@@ -200,30 +224,62 @@ function updateFaecherAnzeige() {
     }
 }
 
-function speichereThemaMitFaechern(themaName) {
+async function speichereThemaMitFaechern(themaName) {
+    if (!window.firebaseInitialized) {
+        alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
+        return;
+    }
+    
     if (ausgewaehlteFaecher.length === 0) {
         alert('Bitte wählen Sie mindestens ein Fach aus!');
         return;
     }
     
-    themen.push({ 
-        name: themaName, 
-        ersteller: currentUser.name,
-        faecher: [...ausgewaehlteFaecher]
-    });
+    // UI blockieren während des Speichervorgangs
+    const createButton = document.querySelector('button[onclick*="speichereThemaMitFaechern"]');
+    const originalText = createButton.textContent;
+    createButton.disabled = true;
+    createButton.textContent = 'Speichern...';
     
-    // Modal schließen
-    schließeFaecherModal();
-    
-    // Eingabefeld leeren
-    document.getElementById('neuesThema').value = '';
-    
-    // Liste neu laden
-    loadThemen();
-    
-    // News erstellen
-    const faecherText = ausgewaehlteFaecher.map(f => getFachName(f)).join(', ');
-    addNews('Neues Thema', `Das Thema "${themaName}" wurde für die Fächer ${faecherText} hinzugefügt.`);
+    try {
+        const neuesThema = {
+            name: themaName,
+            ersteller: currentUser.name,
+            faecher: [...ausgewaehlteFaecher],
+            created: new Date().toISOString()
+        };
+        
+        // Firebase speichern
+        const result = await window.FirebaseClient.save('themen', neuesThema);
+        
+        if (result.success) {
+            // Lokalen Zustand aktualisieren
+            neuesThema.id = result.id;
+            themen.push(neuesThema);
+            
+            // Modal schließen
+            schließeFaecherModal();
+            
+            // Eingabefeld leeren
+            document.getElementById('neuesThema').value = '';
+            
+            // Liste neu laden
+            loadThemen();
+            
+            // News erstellen
+            const faecherText = ausgewaehlteFaecher.map(f => getFachName(f)).join(', ');
+            await addNews('Neues Thema', `Das Thema "${themaName}" wurde für die Fächer ${faecherText} hinzugefügt.`);
+        } else {
+            throw new Error(result.error || 'Unbekannter Fehler beim Speichern');
+        }
+    } catch (error) {
+        console.error('❌ Fehler beim Speichern des Themas:', error);
+        alert(`Fehler beim Speichern: ${error.message}`);
+    } finally {
+        // UI entsperren
+        createButton.disabled = false;
+        createButton.textContent = originalText;
+    }
 }
 
 function bestaetigeFaecherAuswahl() {
@@ -240,16 +296,48 @@ function schließeFaecherModal() {
 }
 
 function themaAuswaehlen(thema) {
-    document.getElementById('gruppenThema').value = thema;
+    const gruppenThemaInput = document.getElementById('gruppenThema');
+    if (gruppenThemaInput) {
+        gruppenThemaInput.value = thema;
+    }
     openTab('gruppen');
-    document.querySelector('[onclick="openTab(\'gruppen\')"]').classList.add('active');
-}
-
-function themaLoeschen(index) {
-    const thema = themen[index];
-    if (confirm(`Thema "${thema.name}" wirklich löschen?`)) {
-        themen.splice(index, 1);
-        loadThemen();
-        addNews('Thema gelöscht', `Das Thema "${thema.name}" wurde entfernt.`);
+    const gruppenTabButton = document.querySelector('[onclick="openTab(\'gruppen\')"]');
+    if (gruppenTabButton) {
+        gruppenTabButton.classList.add('active');
     }
 }
+
+async function themaLoeschen(index) {
+    if (!window.firebaseInitialized) {
+        alert('Bitte warten Sie, bis die Verbindung zu Firebase hergestellt ist.');
+        return;
+    }
+    
+    const thema = themen[index];
+    if (!thema) {
+        alert('Thema nicht gefunden');
+        return;
+    }
+    
+    if (confirm(`Thema "${thema.name}" wirklich löschen?`)) {
+        try {
+            // Firebase löschen
+            if (thema.id) {
+                const result = await window.FirebaseClient.delete('themen', thema.id);
+                if (!result.success) {
+                    throw new Error(result.error || 'Unbekannter Fehler beim Löschen');
+                }
+            }
+            
+            // Lokal löschen
+            themen.splice(index, 1);
+            loadThemen();
+            await addNews('Thema gelöscht', `Das Thema "${thema.name}" wurde entfernt.`);
+        } catch (error) {
+            console.error('❌ Fehler beim Löschen des Themas:', error);
+            alert(`Fehler beim Löschen: ${error.message}`);
+        }
+    }
+}
+
+console.log('📋 Themen-System geladen');

@@ -49,17 +49,12 @@ function setupLoginStatusUpdates() {
         checkFirebaseStatus();
     }, 1000);
     
-    // Sichere Tab-Inhalte Ladung
-setTimeout(() => {
-    try {
-        loadTabInhalte();
-    } catch (error) {
-        console.warn('⚠️ Einige Tab-Inhalte konnten nicht geladen werden:', error);
-        // Lade zumindest die kritischen Funktionen
-        if (typeof loadNews === 'function') loadNews();
-        if (typeof loadThemen === 'function') loadThemen();
-    }
-}, 500);
+    // Stop interval wenn Firebase bereit ist
+    setTimeout(() => {
+        if (window.firebaseInitialized) {
+            clearInterval(statusInterval);
+        }
+    }, 10000);
 }
 
 async function loginUser() {
@@ -239,6 +234,24 @@ function updateConnectionStatusInHeader() {
     }
 }
 
+// KRITISCHE Funktion: Firebase-Daten bereinigen
+function cleanFirebaseData(data, expectedStructure = null) {
+    if (!data || typeof data !== 'object') return data;
+    
+    const cleaned = { ...data };
+    
+    // Entferne Firebase-Metadaten
+    delete cleaned.id;
+    delete cleaned.lastModified;
+    delete cleaned.created;
+    delete cleaned.lastUpdate;
+    
+    // Debug-Ausgabe
+    console.log('🧹 Bereinigte Firebase-Daten:', Object.keys(cleaned));
+    
+    return cleaned;
+}
+
 // Initiale Daten aus Firebase laden - NUR NACH LOGIN
 async function loadInitialData() {
     try {
@@ -247,27 +260,38 @@ async function loadInitialData() {
         // Lade App-Einstellungen
         const settingsResult = await window.FirebaseClient.load('settings');
         if (settingsResult.success && settingsResult.data.length > 0) {
-            const settings = settingsResult.data.find(s => s.id === 'app-settings');
-            if (settings) {
-                if (settings.schuljahr) {
-                    window.schuljahr = settings.schuljahr;
-                    schuljahr = settings.schuljahr;
+            const settingsDoc = settingsResult.data.find(s => s.id === 'app-settings');
+            if (settingsDoc) {
+                console.log('📋 Settings-Struktur:', Object.keys(settingsDoc));
+                
+                if (settingsDoc.schuljahr) {
+                    window.schuljahr = settingsDoc.schuljahr;
+                    schuljahr = settingsDoc.schuljahr;
                 }
-                if (settings.alleFaecherGlobal) {
-                    window.alleFaecherGlobal = settings.alleFaecherGlobal;
-                    alleFaecherGlobal = settings.alleFaecherGlobal;
+                
+                // Prüfe ob Settings die globalen Daten enthalten
+                if (settingsDoc.alleFaecherGlobal && Object.keys(settingsDoc.alleFaecherGlobal).length > 0) {
+                    window.alleFaecherGlobal = cleanFirebaseData(settingsDoc.alleFaecherGlobal);
+                    alleFaecherGlobal = window.alleFaecherGlobal;
+                    console.log('📚 Fächer aus Settings geladen');
                 }
-                if (settings.bewertungsCheckpoints) {
-                    window.bewertungsCheckpoints = settings.bewertungsCheckpoints;
-                    bewertungsCheckpoints = settings.bewertungsCheckpoints;
+                
+                if (settingsDoc.bewertungsCheckpoints && Object.keys(settingsDoc.bewertungsCheckpoints).length > 0) {
+                    window.bewertungsCheckpoints = cleanFirebaseData(settingsDoc.bewertungsCheckpoints);
+                    bewertungsCheckpoints = window.bewertungsCheckpoints;
+                    console.log('✅ Checkpoints aus Settings geladen');
                 }
-                if (settings.briefvorlage) {
-                    window.briefvorlage = settings.briefvorlage;
-                    briefvorlage = settings.briefvorlage;
+                
+                if (settingsDoc.briefvorlage && settingsDoc.briefvorlage.anrede) {
+                    window.briefvorlage = cleanFirebaseData(settingsDoc.briefvorlage);
+                    briefvorlage = window.briefvorlage;
+                    console.log('📝 Briefvorlage aus Settings geladen');
                 }
-                if (settings.staerkenFormulierungen) {
-                    window.staerkenFormulierungen = settings.staerkenFormulierungen;
-                    staerkenFormulierungen = settings.staerkenFormulierungen;
+                
+                if (settingsDoc.staerkenFormulierungen && Object.keys(settingsDoc.staerkenFormulierungen).length > 0) {
+                    window.staerkenFormulierungen = cleanFirebaseData(settingsDoc.staerkenFormulierungen);
+                    staerkenFormulierungen = window.staerkenFormulierungen;
+                    console.log('📝 Formulierungen aus Settings geladen');
                 }
             }
         }
@@ -276,11 +300,16 @@ async function loadInitialData() {
         if (!alleFaecherGlobal || Object.keys(alleFaecherGlobal).length === 0) {
             const faecherResult = await window.FirebaseClient.load('faecher');
             if (faecherResult.success && faecherResult.data.length > 0) {
-                const faecher = faecherResult.data.find(f => f.id === 'standard-faecher');
-                if (faecher && faecher.D) { // Prüfe ob es echte Fächer-Daten sind
-                    window.alleFaecherGlobal = faecher;
-                    alleFaecherGlobal = faecher;
-                    console.log('📚 Fächer geladen');
+                const faecherDoc = faecherResult.data.find(f => f.id === 'standard-faecher');
+                if (faecherDoc) {
+                    const cleanFaecher = cleanFirebaseData(faecherDoc);
+                    
+                    // Prüfe ob es echte Fächer-Daten sind
+                    if (cleanFaecher.D) {
+                        window.alleFaecherGlobal = cleanFaecher;
+                        alleFaecherGlobal = cleanFaecher;
+                        console.log('📚 Fächer separat geladen');
+                    }
                 }
             }
         }
@@ -289,11 +318,16 @@ async function loadInitialData() {
         if (!bewertungsCheckpoints || Object.keys(bewertungsCheckpoints).length === 0) {
             const checkpointsResult = await window.FirebaseClient.load('checkpoints');
             if (checkpointsResult.success && checkpointsResult.data.length > 0) {
-                const checkpoints = checkpointsResult.data.find(c => c.id === 'bewertungs-checkpoints');
-                if (checkpoints && checkpoints['Fachliches Arbeiten']) { // Prüfe ob es echte Checkpoint-Daten sind
-                    window.bewertungsCheckpoints = checkpoints;
-                    bewertungsCheckpoints = checkpoints;
-                    console.log('✅ Bewertungs-Checkpoints geladen');
+                const checkpointsDoc = checkpointsResult.data.find(c => c.id === 'bewertungs-checkpoints');
+                if (checkpointsDoc) {
+                    const cleanCheckpoints = cleanFirebaseData(checkpointsDoc);
+                    
+                    // Prüfe ob es echte Checkpoint-Daten sind
+                    if (cleanCheckpoints['Fachliches Arbeiten']) {
+                        window.bewertungsCheckpoints = cleanCheckpoints;
+                        bewertungsCheckpoints = cleanCheckpoints;
+                        console.log('✅ Bewertungs-Checkpoints separat geladen');
+                    }
                 }
             }
         }
@@ -302,18 +336,22 @@ async function loadInitialData() {
         if (!briefvorlage || !briefvorlage.anrede) {
             const briefvorlagenResult = await window.FirebaseClient.load('briefvorlagen');
             if (briefvorlagenResult.success && briefvorlagenResult.data.length > 0) {
-                const vorlage = briefvorlagenResult.data.find(v => v.id === 'standard-vorlage');
-                if (vorlage && vorlage.anrede) {
-                    window.briefvorlage = vorlage;
-                    briefvorlage = vorlage;
-                    console.log('📝 Briefvorlage geladen');
+                const vorlageDoc = briefvorlagenResult.data.find(v => v.id === 'standard-vorlage');
+                if (vorlageDoc && vorlageDoc.anrede) {
+                    const cleanVorlage = cleanFirebaseData(vorlageDoc);
+                    
+                    window.briefvorlage = cleanVorlage;
+                    briefvorlage = cleanVorlage;
+                    console.log('📝 Briefvorlage separat geladen');
                 }
                 
-                const formulierungen = briefvorlagenResult.data.find(v => v.id === 'staerken-formulierungen');
-                if (formulierungen) {
-                    window.staerkenFormulierungen = formulierungen;
-                    staerkenFormulierungen = formulierungen;
-                    console.log('📝 Stärken-Formulierungen geladen');
+                const formulierungenDoc = briefvorlagenResult.data.find(v => v.id === 'staerken-formulierungen');
+                if (formulierungenDoc) {
+                    const cleanFormulierungen = cleanFirebaseData(formulierungenDoc);
+                    
+                    window.staerkenFormulierungen = cleanFormulierungen;
+                    staerkenFormulierungen = cleanFormulierungen;
+                    console.log('📝 Stärken-Formulierungen separat geladen');
                 }
             }
         }
@@ -362,11 +400,37 @@ async function loadInitialData() {
             }
         }
         
+        // DEBUG: Zeige die Struktur der geladenen Checkpoints
+        console.log('🔍 DEBUG bewertungsCheckpoints Struktur:', bewertungsCheckpoints);
+        if (bewertungsCheckpoints && typeof bewertungsCheckpoints === 'object') {
+            Object.keys(bewertungsCheckpoints).forEach(key => {
+                console.log(`🔍 Kategorie "${key}":`, Array.isArray(bewertungsCheckpoints[key]) ? 'Array' : typeof bewertungsCheckpoints[key]);
+            });
+        }
+        
         console.log('✅ Alle Daten geladen');
         
         // Initialisiere UI nach Datenladen
         loadSchuelerLehrerAuswahl();
-        loadTabInhalte();
+        
+        // Tab-Inhalte VORSICHTIG laden
+        setTimeout(() => {
+            try {
+                if (typeof window.loadNews === 'function') {
+                    window.loadNews();
+                } else {
+                    console.warn('⚠️ loadNews noch nicht verfügbar');
+                }
+                
+                if (typeof window.loadThemen === 'function') {
+                    window.loadThemen();
+                } else {
+                    console.warn('⚠️ loadThemen noch nicht verfügbar');
+                }
+            } catch (error) {
+                console.warn('⚠️ Einige Tab-Inhalte konnten nicht geladen werden:', error);
+            }
+        }, 1000); // Längere Verzögerung
         
         // Event auslösen, dass Daten geladen sind
         window.dispatchEvent(new CustomEvent('dataLoaded', { detail: { success: true } }));

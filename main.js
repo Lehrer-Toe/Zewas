@@ -960,22 +960,29 @@ async function lehrerHinzufuegen() {
         const result = await window.FirebaseClient.createUser(email, password, userData);
         
         if (result.success) {
-            // Lokalen Zustand aktualisieren
-            const neuerLehrer = {
-                ...userData,
-                id: result.uid
-            };
-            
-            users.push(neuerLehrer);
-            
             // Felder zurücksetzen
             document.getElementById('lehrerName').value = '';
             document.getElementById('lehrerEmail').value = '';
             document.getElementById('lehrerPasswort').value = 'lehrer123';
             
-            loadLehrer();
-            loadSchuelerLehrerAuswahl();
-            await addNews('Neuer Lehrer', `${name} wurde als Lehrer angelegt.`);
+            if (result.requiresRelogin) {
+                // Der Admin muss sich wieder anmelden
+                alert(`Lehrer ${name} wurde erfolgreich erstellt. Sie werden zur Anmeldung weitergeleitet.`);
+                // Die Seite wird automatisch neu geladen
+                return;
+            } else {
+                // Lokalen Zustand aktualisieren (nur wenn kein Reload erforderlich)
+                const neuerLehrer = {
+                    ...userData,
+                    id: result.uid
+                };
+                
+                users.push(neuerLehrer);
+                
+                loadLehrer();
+                loadSchuelerLehrerAuswahl();
+                await addNews('Neuer Lehrer', `${name} wurde als Lehrer angelegt.`);
+            }
         } else {
             throw new Error(result.error || 'Unbekannter Fehler beim Erstellen des Benutzers');
         }
@@ -983,9 +990,11 @@ async function lehrerHinzufuegen() {
         console.error('❌ Fehler beim Erstellen des Lehrers:', error);
         alert(`Fehler beim Erstellen: ${error.message}`);
     } finally {
-        // UI entsperren
-        createButton.disabled = false;
-        createButton.textContent = originalText;
+        // UI entsperren (nur wenn die Seite nicht neu geladen wird)
+        if (createButton.textContent === 'Erstelle Benutzer...') {
+            createButton.disabled = false;
+            createButton.textContent = originalText;
+        }
     }
 }
 

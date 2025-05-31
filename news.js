@@ -1,3 +1,161 @@
+// News-System mit Firebase-Integration
+async function loadNews() {
+    const liste = document.getElementById('newsList');
+    if (!liste) return;
+    
+    // Admin News Editor nur für Admins anzeigen
+    const adminEditor = document.getElementById('adminNewsEditor');
+    if (adminEditor && currentUser && currentUser.role === 'admin') {
+        adminEditor.style.display = 'block';
+    }
+    
+    if (!window.firebaseInitialized) {
+        liste.innerHTML = '<div class="card"><p>Warte auf Firebase-Verbindung...</p></div>';
+        return;
+    }
+    
+    if (!news || news.length === 0) {
+        liste.innerHTML = '<div class="card"><p>Keine Nachrichten vorhanden.</p></div>';
+        return;
+    }
+    
+    // News nach Datum sortieren (neueste zuerst)
+    const sortedNews = [...news].sort((a, b) => {
+        const dateA = new Date(a.created || a.datum || '2024-01-01');
+        const dateB = new Date(b.created || b.datum || '2024-01-01');
+        return dateB - dateA;
+    });
+    
+    let html = '';
+    sortedNews.forEach((newsItem, index) => {
+        // Prüfe ob News abgelaufen ist
+        if (newsItem.ablauf) {
+            const ablaufDatum = new Date(newsItem.ablauf);
+            if (ablaufDatum < new Date()) {
+                return; // Überspringe abgelaufene News
+            }
+        }
+        
+        const wichtigClass = newsItem.wichtig ? 'wichtig' : '';
+        
+        html += `<div class="news-item ${wichtigClass}">
+            <div class="news-gelesen-bereich">
+                <input type="checkbox" ${newsItem.gelesen ? 'checked' : ''} 
+                       onchange="newsGelesenToggle(${index}, this.checked)">
+                <label>Gelesen</label>
+            </div>
+            <h3>${newsItem.titel}</h3>
+            <p>${newsItem.text}</p>
+            <small>Von: ${newsItem.autor} am ${newsItem.datum}</small>
+            ${currentUser && currentUser.role === 'admin' ? 
+                `<div style="margin-top: 10px;">
+                    <button class="btn btn-sm btn-danger" onclick="newsLoeschen(${index})">Löschen</button>
+                </div>` : 
+                ''}
+        </div>`;
+    });
+    
+    if (!html) {
+        html = '<div class="card"><p>Keine aktuellen Nachrichten.</p></div>';
+    }
+    
+    liste.innerHTML = html;
+}
+
+function newsGelesenToggle(index, gelesen) {
+    if (news[index]) {
+        news[index].gelesen = gelesen;
+        
+        // In Firebase speichern falls verfügbar
+        if (window.firebaseInitialized && news[index].id) {
+            window.FirebaseClient.save('news', news[index], news[index].id)
+                .catch(error => console.warn('News-Status konnte nicht gespeichert werden:', error));
+        }
+    }
+}
+
+async function newsLoeschen(index) {
+    if (currentUser.role !== 'admin') {
+        alert('Keine Berechtigung');
+        return;
+    }
+    
+    if (confirm('Nachricht wirklich löschen?')) {
+        const newsItem = news[index];
+        
+        // Aus Firebase löschen falls verfügbar
+        if (window.firebaseInitialized && newsItem.id) {
+            try {
+                const result = await window.FirebaseClient.delete('news', newsItem.id);
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error('Fehler beim Löschen der News:', error);
+                alert('Fehler beim Löschen: ' + error.message);
+                return;
+            }
+        }
+        
+        // Lokal löschen
+        news.splice(index, 1);
+        window.news = news;
+        loadNews();
+    }
+}
+
+async function adminNewsErstellen() {
+    if (currentUser.role !== 'admin') {
+        alert('Keine Berechtigung');
+        return;
+    }
+    
+    const titel = document.getElementById('newsTitel').value.trim();
+    const text = document.getElementById('newsText').value.trim();
+    const wichtig = document.getElementById('newsWichtig').checked;
+    const zeitbegrenzt = document.getElementById('newsZeitbegrenzt').checked;
+    const ablauf = zeitbegrenzt ? document.getElementById('newsAblauf').value : null;
+    
+    if (!titel || !text) {
+        alert('Bitte füllen Sie Titel und Text aus!');
+        return;
+    }
+    
+    if (zeitbegrenzt && !ablauf) {
+        alert('Bitte wählen Sie ein Ablaufdatum!');
+        return;
+    }
+    
+    try {
+        await addNews(titel, text, wichtig, 'Administrator', ablauf);
+        
+        // Felder zurücksetzen
+        document.getElementById('newsTitel').value = '';
+        document.getElementById('newsText').value = '';
+        document.getElementById('newsWichtig').checked = false;
+        document.getElementById('newsZeitbegrenzt').checked = false;
+        document.getElementById('newsAblauf').value = '';
+        document.getElementById('newsAblauf').style.display = 'none';
+        
+        loadNews();
+    } catch (error) {
+        console.error('Fehler beim Erstellen der News:', error);
+        alert('Fehler beim Erstellen der Nachricht: ' + error.message);
+    }
+}
+
+// Event-Listener für zeitbegrenzte News
+document.addEventListener('DOMContentLoaded', function() {
+    const zeitbegrenztCheckbox = document.getElementById('newsZeitbegrenzt');
+    const ablaufInput = document.getElementById('newsAblauf');
+    
+    if (zeitbegrenztCheckbox && ablaufInput) {
+        zeitbegrenztCheckbox.addEventListener('change', function() {
+            ablaufInput.style.display = this.checked ? 'inline-block' : 'none';
+        });
+    }
+});
+
 // App-Initialisierung - ONLINE-ONLY MODUS
 function initializeApp() {
     console.log('🚀 Initialisiere App im Online-Modus...');
@@ -91,3 +249,5 @@ function loadTabInhalte() {
         if (tabId === 'adminvorlagen') loadAdminVorlagen();
     }
 }
+
+console.log('📰 News-System geladen');

@@ -62,6 +62,9 @@ async function loadNews() {
     liste.innerHTML = html;
 }
 
+// GLOBALE Registrierung der loadNews Funktion
+window.loadNews = loadNews;
+
 function newsGelesenToggle(index, gelesen) {
     if (news[index]) {
         news[index].gelesen = gelesen;
@@ -228,20 +231,6 @@ function showFirebaseError(message) {
     `;
     
     document.body.appendChild(errorDiv);
-}
-
-function loadTabInhalte() {
-    try {
-        // Lade News nur wenn die Funktion verfügbar ist
-        if (typeof loadNews === 'function') {
-            loadNews();
-        } else {
-            console.warn('⚠️ loadNews Funktion noch nicht verfügbar');
-        }
-        // ... weitere sichere Aufrufe
-    } catch (error) {
-        console.error('❌ Fehler in loadTabInhalte:', error);
-    }
 }
 
 console.log('📰 News-System geladen');

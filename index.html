@@ -10,6 +10,7 @@
     <link rel="preload" href="env-config.js" as="script">
     <link rel="preload" href="fireconfig.js" as="script">
     <link rel="preload" href="fireclient.js" as="script">
+    <link rel="preload" href="main.js" as="script">
     
     <!-- Meta Tags für bessere Performance -->
     <meta name="description" content="Bewertungssystem für Schulprojekte - Zeig, was du kannst!">
@@ -426,86 +427,13 @@
         </div>
     </div>
 
-    <!-- Scripte in korrekter Reihenfolge - KRITISCH! -->
+    <!-- Scripte in KORREKTER Reihenfolge -->
     <script src="env-config.js"></script>
     <script src="fireconfig.js"></script>
     <script src="fireclient.js"></script>
-    
-    <!-- ERSTMAL alle Haupt-Funktionen definieren -->
-    <script>
-    // KRITISCH: Globale Funktionen SOFORT definieren
-    window.loadNews = function() {
-        console.log('🔄 loadNews Fallback - wird später überschrieben');
-    };
-    
-    window.loadThemen = function() {
-        console.log('🔄 loadThemen Fallback - wird später überschrieben');
-    };
-    
-    window.loadGruppen = function() {
-        console.log('🔄 loadGruppen Fallback - wird später überschrieben');
-    };
-    
-    window.loadLehrer = function() {
-        console.log('🔄 loadLehrer Fallback - wird später überschrieben');
-    };
-    
-    window.loadDatenverwaltung = function() {
-        console.log('🔄 loadDatenverwaltung Fallback - wird später überschrieben');
-    };
-    
-    window.loadBewertungen = function() {
-        console.log('🔄 loadBewertungen Fallback - wird später überschrieben');
-    };
-    
-    window.loadVorlagen = function() {
-        console.log('🔄 loadVorlagen Fallback - wird später überschrieben');
-    };
-    
-    window.loadUebersicht = function() {
-        console.log('🔄 loadUebersicht Fallback - wird später überschrieben');
-    };
-    
-    window.loadAdminVorlagen = function() {
-        console.log('🔄 loadAdminVorlagen Fallback - wird später überschrieben');
-    };
-    
-    // Globale Variablen SOFORT initialisieren
-    window.currentUser = null;
-    window.users = [];
-    window.alleFaecherGlobal = {};
-    window.bewertungsCheckpoints = {};
-    window.themen = [];
-    window.gruppen = [];
-    window.bewertungen = [];
-    window.vorlagen = {};
-    window.news = [];
-    window.schuljahr = '';
-    window.briefvorlage = { anrede: '', schluss: '' };
-    window.staerkenFormulierungen = {};
-    
-    // Lokale Variablen
-    let currentUser = null;
-    let users = [];
-    let alleFaecherGlobal = {};
-    let bewertungsCheckpoints = {};
-    let themen = [];
-    let gruppen = [];
-    let bewertungen = [];
-    let vorlagen = {};
-    let news = [];
-    let schuljahr = '';
-    let briefvorlage = { anrede: '', schluss: '' };
-    let staerkenFormulierungen = {};
-    let aktuelleGruppeEdit = null;
-    
-    console.log('🚀 Globale Variablen und Fallback-Funktionen initialisiert');
-    </script>
-    
-    <!-- DANN die eigentlichen Scripts -->
     <script src="main.js"></script>
-    <script src="login.js"></script>
     <script src="news.js"></script>
+    <script src="login.js"></script>
     <script src="themen.js"></script>
     <script src="bewertung.js"></script>
     <script src="pdf.js"></script>

@@ -218,6 +218,11 @@ function loadStaerkenTab(vorhandeneBewertung) {
     
     try {
         Object.keys(bewertungsCheckpoints).forEach(kategorie => {
+            // Ignoriere Firebase-Metadaten
+            if (kategorie === 'id' || kategorie === 'lastModified') {
+                return;
+            }
+            
             const checkpoints = bewertungsCheckpoints[kategorie];
             
             // Sicherheitsprüfung: Stelle sicher, dass checkpoints ein Array ist
@@ -756,3 +761,6 @@ function updatePDFButtonStatus(schuelerId) {
 }
 
 console.log('✅ Bewertungs-System geladen');
+
+// GLOBALE Registrierung der loadBewertungen Funktion
+window.loadBewertungen = loadBewertungen;

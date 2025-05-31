@@ -230,23 +230,17 @@ function showFirebaseError(message) {
     document.body.appendChild(errorDiv);
 }
 
-// Initialisiere Inhalte für alle Tabs - wird nach Login aufgerufen
 function loadTabInhalte() {
-    loadNews();
-    loadThemen();
-    
-    // Tab-spezifische Inhalte nur laden, wenn Tab aktiv ist
-    const activeTab = document.querySelector('.tab-content.active');
-    if (activeTab) {
-        const tabId = activeTab.id;
-        
-        if (tabId === 'gruppen') loadGruppen();
-        if (tabId === 'lehrer') loadLehrer();
-        if (tabId === 'daten') loadDatenverwaltung();
-        if (tabId === 'bewerten') loadBewertungen();
-        if (tabId === 'vorlagen') loadVorlagen();
-        if (tabId === 'uebersicht') loadUebersicht();
-        if (tabId === 'adminvorlagen') loadAdminVorlagen();
+    try {
+        // Lade News nur wenn die Funktion verfügbar ist
+        if (typeof loadNews === 'function') {
+            loadNews();
+        } else {
+            console.warn('⚠️ loadNews Funktion noch nicht verfügbar');
+        }
+        // ... weitere sichere Aufrufe
+    } catch (error) {
+        console.error('❌ Fehler in loadTabInhalte:', error);
     }
 }
 

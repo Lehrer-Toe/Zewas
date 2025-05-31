@@ -465,6 +465,11 @@ function loadStaerkenFormulierungen() {
     
     try {
         Object.keys(bewertungsCheckpoints).forEach(kategorie => {
+            // Ignoriere Firebase-Metadaten
+            if (kategorie === 'id' || kategorie === 'lastModified') {
+                return;
+            }
+            
             const checkpoints = bewertungsCheckpoints[kategorie];
             
             // Sicherheitsprüfung: Stelle sicher, dass checkpoints ein Array ist
